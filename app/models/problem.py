@@ -1,3 +1,4 @@
+from sqlalchemy.orm import relationship
 from sqlalchemy import Column, Integer, String, Text
 
 from app.models.base import Base
@@ -52,3 +53,9 @@ class Problem(Base):
         Text,
         nullable=False
     )
+
+    test_cases = relationship(
+    "TestCase",
+    back_populates="problem",
+    cascade="all, delete-orphan"
+)
