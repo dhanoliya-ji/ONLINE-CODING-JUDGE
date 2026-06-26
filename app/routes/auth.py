@@ -17,13 +17,6 @@ router = APIRouter(
     tags=["Authentication"]
 )
 
-# print("✅ auth.py loaded")
-@router.post(
-    "/register",
-    response_model=UserResponse,
-    status_code=201
-)
-
 @router.post(
     "/register",
     response_model=UserResponse,
@@ -33,13 +26,19 @@ def register(
     user: UserCreate,
     db: Session = Depends(get_db)
 ):
-    print("STEP 1")
+    existing_username = db.query(User).filter(
+        User.username == user.username
+    ).first()
+
+    if existing_username:
+        raise HTTPException(
+            status_code=400,
+            detail="Username already registered"
+        )
 
     existing_user = db.query(User).filter(
         User.email == user.email
     ).first()
-
-    print("STEP 2")
 
     if existing_user:
         raise HTTPException(
@@ -47,27 +46,17 @@ def register(
             detail="Email already registered"
         )
 
-    print("STEP 3")
-
     new_user = User(
         username=user.username,
         email=user.email,
         hashed_password=hash_password(user.password)
     )
 
-    print("STEP 4")
-
     db.add(new_user)
-
-    print("STEP 5")
 
     db.commit()
 
-    print("STEP 6")
-
     db.refresh(new_user)
-
-    print("STEP 7")
 
     return new_user
 

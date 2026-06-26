@@ -1,18 +1,30 @@
-venv/
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
 
+# Virtual Environment
+venv/
 .env
 
+# IDE
+.vscode/
+.idea/
+
+# Pytest
 .pytest_cache/
 
-.idea/
-.vscode/
-
-*.log
-
-htmlcov/
-.coverage
-
+# Python cache
+*.egg-info/
 dist/
 build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database
+*.sqlite3
