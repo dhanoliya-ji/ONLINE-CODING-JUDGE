@@ -48,3 +48,37 @@ def create_problem(
     db.refresh(new_problem)
 
     return new_problem
+
+@router.get(
+    "/",
+    response_model=list[ProblemResponse]
+)
+def get_all_problems(
+    db: Session = Depends(get_db)
+):
+
+    problems = db.query(Problem).all()
+
+    return problems
+
+@router.get(
+    "/{problem_id}",
+    response_model=ProblemResponse
+)
+def get_problem(
+    problem_id: int,
+    db: Session = Depends(get_db)
+):
+
+    problem = db.query(Problem).filter(
+        Problem.id == problem_id
+    ).first()
+
+    if problem is None:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Problem not found"
+        )
+
+    return problem
