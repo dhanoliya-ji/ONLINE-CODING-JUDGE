@@ -1,10 +1,10 @@
 from app.database import engine
 
 try:
-    connection = engine.connect()
-    print("✅ Database connected successfully!")
-    connection.close()
+    conn = engine.connect()
+    print("✅ Connected Successfully!")
+    conn.close()
 
 except Exception as e:
-    print("❌ Database connection failed!")
+    print("❌ Connection Failed")
     print(e)

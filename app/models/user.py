@@ -13,18 +13,19 @@ class User(Base):
     )
 
     username = Column(
-        String,
+        String(100),
         unique=True,
         nullable=False
     )
 
     email = Column(
-        String,
+        String(255),
         unique=True,
         nullable=False
     )
 
-    password = Column(
+    hashed_password = Column(
+        "password",
         String,
         nullable=False
     )
