@@ -2,22 +2,37 @@
 __pycache__/
 *.py[cod]
 *.pyo
+*.egg-info/
+dist/
+build/
 
-# Virtual Environment
+# Virtual environments
 venv/
+.venv/
+env/
+
+# Secrets - never commit these
 .env
+.env.*
+!.env.example
+
+# Local databases
+*.db
+*.sqlite3
+
+# Test / tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Sandbox scratch space
+.judge-tmp/
 
 # IDE
 .vscode/
 .idea/
-
-# Pytest
-.pytest_cache/
-
-# Python cache
-*.egg-info/
-dist/
-build/
 
 # OS
 .DS_Store
@@ -25,6 +40,3 @@ Thumbs.db
 
 # Logs
 *.log
-
-# Database
-*.sqlite3

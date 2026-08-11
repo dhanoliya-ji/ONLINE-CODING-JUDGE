@@ -1,0 +1,50 @@
+# =========================================================================
+#  Render Blueprint - https://render.com/docs/blueprint-spec
+#
+#  Deploy by pushing this repository to GitHub, then choosing
+#  New -> Blueprint in the Render dashboard and selecting the repo.
+#
+#  DATABASE_URL is intentionally NOT defined here: set it in the Render
+#  dashboard to your Neon connection string so the credential never lands
+#  in version control.
+# =========================================================================
+
+services:
+  - type: web
+    name: online-coding-judge
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    dockerfilePath: ./Dockerfile
+
+    # Render polls this to decide whether an instance is healthy.
+    healthCheckPath: /api/v1/ping
+
+    envVars:
+      # ---- Set manually in the dashboard (marked sync:false) -------------
+      - key: DATABASE_URL
+        sync: false          # paste your Neon pooled connection string here
+      - key: ADMIN_EMAILS
+        sync: false          # the email you will register with, to get admin
+
+      # ---- Generated once by Render and then held stable -----------------
+      - key: SECRET_KEY
+        generateValue: true
+
+      # ---- Fixed configuration -------------------------------------------
+      - key: ENVIRONMENT
+        value: production
+      - key: CORS_ORIGINS
+        value: "*"
+      # Render's free tier does not expose a Docker socket, so the container
+      # sandbox cannot run there. `local` makes that explicit rather than
+      # letting `auto` silently fall back.
+      - key: EXECUTION_BACKEND
+        value: local
+      - key: EXECUTION_TIME_LIMIT_MS
+        value: "2000"
+      - key: EXECUTION_MEMORY_LIMIT_MB
+        value: "128"
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"

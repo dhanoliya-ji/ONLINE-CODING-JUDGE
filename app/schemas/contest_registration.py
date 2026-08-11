@@ -1,17 +1,18 @@
+from __future__ import annotations
+
 from datetime import datetime
-from pydantic import BaseModel
+
+from app.schemas.common import ORMModel
 
 
-class ContestRegistrationResponse(BaseModel):
-
+class ContestRegistrationResponse(ORMModel):
     id: int
-
     contest_id: int
-
     user_id: int
-
     registered_at: datetime
 
-    class Config:
 
-        from_attributes = True
+class ParticipantResponse(ORMModel):
+    id: int
+    username: str
+    registered_at: datetime

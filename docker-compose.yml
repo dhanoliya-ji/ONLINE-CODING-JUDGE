@@ -1,49 +1,64 @@
-version: "3.9"
+# =========================================================================
+#  Local development stack: Postgres + the API, with the real Docker sandbox.
+#
+#      docker compose up --build
+#      docker compose exec api python -m scripts.seed
+#
+#  Swagger UI: http://localhost:8000/docs
+# =========================================================================
 
 services:
 
   postgres:
-
-    image: postgres:16
-
+    image: postgres:16-alpine
     container_name: online_judge_db
-
-    restart: always
-
+    restart: unless-stopped
     environment:
-
       POSTGRES_USER: postgres
-
       POSTGRES_PASSWORD: postgres
-
       POSTGRES_DB: online_judge
-
     ports:
-
       - "5432:5432"
-
     volumes:
-
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # The API waits for this rather than racing the database on boot.
+      test: ["CMD-SHELL", "pg_isready -U postgres -d online_judge"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   api:
-
     build: .
-
     container_name: online_judge_api
-
+    restart: unless-stopped
     depends_on:
-
-      - postgres
-
+      postgres:
+        condition: service_healthy
     ports:
-
       - "8000:8000"
-
-    env_file:
-
-      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/online_judge
+      SECRET_KEY: ${SECRET_KEY:-local-development-secret-change-me}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-admin@example.com}
+      ENVIRONMENT: development
+      EXECUTION_BACKEND: auto
+      # Must match the bind mount below on BOTH sides - see the comment there.
+      EXECUTION_WORKDIR: /tmp/judge
+    volumes:
+      # Grants the API access to the host's Docker daemon so submissions can
+      # be executed in sibling containers.
+      #
+      # SECURITY: access to this socket is equivalent to root on the host.
+      # It is appropriate for local development. For a public deployment,
+      # run the judge on an isolated worker host, or drop this mount and let
+      # the API fall back to the local sandbox.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Staging directory for sandbox scratch space, mounted at the SAME
+      # absolute path inside the container as on the host. Bind mounts are
+      # resolved by the daemon on the host, so a path that exists only inside
+      # this container would mount as an empty directory.
+      - /tmp/judge:/tmp/judge
 
 volumes:
-
   postgres_data:
