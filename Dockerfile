@@ -1,56 +1,58 @@
 # =========================================================================
 #  Online Coding Judge - production image
 #
-#  The runtime layer ships the Python, C++ and Java toolchains so that the
-#  local sandbox can compile and execute all three languages even on hosts
-#  that do not expose a Docker socket (free PaaS tiers, most notably).  Where
-#  a socket *is* available the Docker backend takes over automatically and
-#  these toolchains simply go unused.
+#  The image ships the Python, C++ and Java toolchains so the local sandbox
+#  can compile and execute all three languages even on hosts that do not
+#  expose a Docker socket (free PaaS tiers, most notably).  Where a socket
+#  *is* available the Docker backend takes over automatically and these
+#  toolchains simply go unused.
+#
+#  Deliberately a single stage.  Every dependency in requirements.txt ships a
+#  prebuilt manylinux wheel, so there is nothing to compile at install time
+#  and a builder stage would only add failure modes (a `--no-index` install
+#  breaks if the wheel set is incomplete for any reason).
 # =========================================================================
 
-# ---- Stage 1: build wheels ---------------------------------------------
-FROM python:3.11-slim AS builder
-
-ENV PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends gcc libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /wheels
-COPY requirements.txt .
-RUN pip wheel --wheel-dir /wheels -r requirements.txt
-
-
-# ---- Stage 2: runtime ---------------------------------------------------
-FROM python:3.11-slim AS runtime
+FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DEBIAN_FRONTEND=noninteractive \
     PORT=8000
 
-# libpq5 for psycopg2; g++ and the JDK for the C++/Java toolchains.
+# ca-certificates is installed first and on its own: the Java packages run a
+# post-install hook that needs it, and installing them together is a known
+# source of dpkg failures on slim images.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Runtime dependencies:
+#   libpq5                  - psycopg2 needs it to talk to Postgres
+#   g++                     - compiles C++ submissions
+#   openjdk-17-jdk-headless - compiles and runs Java submissions.
+#     Named explicitly rather than via the `default-jdk-headless` metapackage,
+#     and `-headless` to skip the ~200 MB of GUI libraries a judge never uses.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libpq5 \
         g++ \
-        default-jdk-headless \
-        curl \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY --from=builder /wheels /wheels
-COPY requirements.txt .
-RUN pip install --no-index --find-links=/wheels -r requirements.txt \
-    && rm -rf /wheels requirements.txt
+        openjdk-17-jdk-headless \
+    && rm -rf /var/lib/apt/lists/* \
+    && javac -version && g++ --version | head -1
 
 WORKDIR /app
+
+# Dependencies before source, so a code change does not invalidate this layer.
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
 COPY . .
 
-# Run as an unprivileged user. Note this is defence in depth for the *API*;
-# the sandbox applies its own, much stricter, per-submission isolation.
+# Run as an unprivileged user. This is defence in depth for the *API*; the
+# sandbox applies its own, much stricter, per-submission isolation.
 RUN useradd --create-home --uid 10001 judge \
     && mkdir -p /tmp/judge \
     && chown -R judge:judge /app /tmp/judge
@@ -58,8 +60,8 @@ USER judge
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD curl -fsS "http://localhost:${PORT}/api/v1/ping" || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -fsS "http://localhost:${PORT:-8000}/api/v1/ping" || exit 1
 
 # Render and similar platforms inject $PORT; default to 8000 locally.
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2 --proxy-headers"]

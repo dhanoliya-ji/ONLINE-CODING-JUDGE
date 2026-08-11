@@ -195,7 +195,7 @@ isolation locally and still deploy to a free host that forbids it.
 </td><td width="50%" valign="top">
 
 **Submissions & judging**
-- Python 3.11, C++17 (GCC), Java 21
+- Python 3.11, C++17 (GCC), Java 17
 - Seven verdicts including Compilation Error and MLE
 - Real execution time and peak memory
 - Per-test breakdown; diffs for samples only
@@ -616,7 +616,7 @@ curl http://localhost:8000/api/v1/health
 Pre-pull the language images once to avoid a slow first submission:
 
 ```bash
-docker pull python:3.11-slim && docker pull gcc:13 && docker pull eclipse-temurin:21-jdk
+docker pull python:3.11-slim && docker pull gcc:13 && docker pull eclipse-temurin:17-jdk
 ```
 
 > ⚠️ Compose mounts `/var/run/docker.sock` into the API container. That is

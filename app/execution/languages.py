@@ -82,11 +82,13 @@ LANGUAGES: dict[str, LanguageSpec] = {
     ),
     Language.JAVA.value: LanguageSpec(
         id=Language.JAVA.value,
-        display_name="Java 21",
+        display_name="Java 17",
         source_filename="Main.java",
         compile_cmd=["javac", "-encoding", "UTF-8", "Main.java"],
         run_cmd=["java", "-cp", ".", "Main"],
-        docker_image="eclipse-temurin:21-jdk",
+        # Kept in step with the JDK baked into the Dockerfile, so a submission
+        # behaves identically on either backend.
+        docker_image="eclipse-temurin:17-jdk",
         local_requirements=("javac", "java"),
         artifact="Main.class",
         supports_address_space_limit=False,
