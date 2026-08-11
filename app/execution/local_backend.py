@@ -75,6 +75,17 @@ class LocalBackend(SandboxBackend):
     # ------------------------------------------------------------------ #
     def run(self, request: ExecutionRequest) -> ExecutionResult:
         try:
+            return self._run(request)
+        except Exception as exc:  # noqa: BLE001 - the backend must never raise
+            logger.exception("Local backend failed")
+            return ExecutionResult(
+                outcome=Outcome.INTERNAL_ERROR,
+                detail=f"{type(exc).__name__}: {exc}",
+                backend=self.name,
+            )
+
+    def _run(self, request: ExecutionRequest) -> ExecutionResult:
+        try:
             spec = get_language(request.language)
         except ValueError as exc:
             return ExecutionResult(
@@ -133,10 +144,11 @@ class LocalBackend(SandboxBackend):
                 compile_output="Compilation timed out",
                 backend=self.name,
             )
-        except OSError as exc:
+        except Exception as exc:  # noqa: BLE001 - see _execute for the rationale
+            logger.exception("Local compilation failed to start")
             return ExecutionResult(
                 outcome=Outcome.INTERNAL_ERROR,
-                detail=f"Failed to start compiler: {exc}",
+                detail=f"Failed to start compiler: {type(exc).__name__}: {exc}",
                 backend=self.name,
             )
 
@@ -193,10 +205,16 @@ class LocalBackend(SandboxBackend):
                 duration_ms=round((time.perf_counter() - started) * 1000, 2),
                 backend=self.name,
             )
-        except OSError as exc:
+        except Exception as exc:  # noqa: BLE001
+            # Deliberately broad. A sandbox backend must never raise: the judge
+            # turns an ExecutionResult into a verdict, whereas an exception
+            # becomes a 500 and the user loses their submission. OSError covers
+            # a missing binary, but subprocess also raises SubprocessError for
+            # preexec_fn failures, and the detail is worth surfacing either way.
+            logger.exception("Local execution failed to start")
             return ExecutionResult(
                 outcome=Outcome.INTERNAL_ERROR,
-                detail=f"Failed to start program: {exc}",
+                detail=f"Failed to start program: {type(exc).__name__}: {exc}",
                 backend=self.name,
             )
 
@@ -301,7 +319,11 @@ def _build_preexec(spec: LanguageSpec, request: ExecutionRequest):  # pragma: no
 
     def _limit() -> None:
         assert resource is not None
-        os.setsid()
+        # NB: do NOT call os.setsid() here. `start_new_session=True` already
+        # does it, and CPython runs setsid() *before* preexec_fn - so a second
+        # call fails with EPERM (the child is already a session leader).
+        # CPython reports any preexec_fn failure as SubprocessError, which is
+        # not an OSError, so it escapes narrow handlers and 500s the request.
 
         if apply_address_space:
             resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
