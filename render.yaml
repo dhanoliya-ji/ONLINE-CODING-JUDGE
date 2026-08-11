@@ -1,22 +1,29 @@
 # =========================================================================
 #  Render Blueprint - https://render.com/docs/blueprint-spec
 #
-#  Deploy by pushing this repository to GitHub, then choosing
-#  New -> Blueprint in the Render dashboard and selecting the repo.
+#  Deploys on Render's NATIVE PYTHON runtime, not Docker. Render's free tier
+#  does not expose a Docker socket, so the container sandbox could never have
+#  run there anyway; building an image only added a slow, fragile build step
+#  for no isolation benefit. `pip install` on the native runtime is faster and
+#  has far fewer moving parts.
 #
-#  DATABASE_URL is intentionally NOT defined here: set it in the Render
-#  dashboard to your Neon connection string so the credential never lands
-#  in version control.
+#  The Docker sandbox is still the real one - use `docker compose up` locally
+#  to run submissions with full container isolation.
+#
+#  DATABASE_URL is deliberately NOT defined here: set it in the Render
+#  dashboard so the credential never lands in version control.
 # =========================================================================
 
 services:
   - type: web
     name: online-coding-judge
-    runtime: docker
+    runtime: python
     plan: free
     region: oregon
     branch: main
-    dockerfilePath: ./Dockerfile
+
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --workers 2
 
     # Render polls this to decide whether an instance is healthy.
     healthCheckPath: /api/v1/ping
@@ -26,20 +33,23 @@ services:
       - key: DATABASE_URL
         sync: false          # paste your Neon pooled connection string here
       - key: ADMIN_EMAILS
-        sync: false          # the email you will register with, to get admin
+        sync: false          # the email you register with, to get admin
 
       # ---- Generated once by Render and then held stable -----------------
       - key: SECRET_KEY
         generateValue: true
 
-      # ---- Fixed configuration -------------------------------------------
+      # ---- Runtime -------------------------------------------------------
+      - key: PYTHON_VERSION
+        value: "3.11.9"
       - key: ENVIRONMENT
         value: production
       - key: CORS_ORIGINS
         value: "*"
-      # Render's free tier does not expose a Docker socket, so the container
-      # sandbox cannot run there. `local` makes that explicit rather than
-      # letting `auto` silently fall back.
+
+      # ---- Execution engine ----------------------------------------------
+      # No Docker socket on Render, so the rlimit sandbox is the only option.
+      # Stated explicitly rather than letting `auto` fall back silently.
       - key: EXECUTION_BACKEND
         value: local
       - key: EXECUTION_TIME_LIMIT_MS

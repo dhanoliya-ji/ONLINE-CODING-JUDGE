@@ -739,6 +739,11 @@ git push origin main
 3. Connect your GitHub account and pick `online-coding-judge`.
 4. Render detects [`render.yaml`](render.yaml) and proposes a free web service.
 
+> The blueprint uses Render's **native Python runtime**, not Docker. Render's
+> free tier exposes no Docker socket, so building an image bought no isolation
+> — only a slow, brittle build. `pip install` is faster and far simpler. The
+> Docker sandbox remains the real one; run `docker compose up` locally for it.
+
 #### Step 3 — Set the two secret variables
 
 `render.yaml` deliberately leaves these blank (`sync: false`) so no credential
@@ -754,8 +759,7 @@ deploys. Everything else is preset in the blueprint.
 
 #### Step 4 — Deploy
 
-Click **Apply**. The first build takes 5–10 minutes (the image installs GCC and
-a JDK). When it goes live:
+Click **Apply**. The build takes 2–3 minutes. When it goes live:
 
 ```bash
 curl https://<your-service>.onrender.com/api/v1/ping
@@ -791,6 +795,15 @@ subdomain, and update the badge URLs at the top with your GitHub username.
 - **750 instance-hours/month** — plenty for one service.
 - **No Docker socket**, hence `EXECUTION_BACKEND=local` in the blueprint.
 - **Ephemeral filesystem** — never use SQLite here; it is wiped on redeploy.
+- **Language toolchains**: Python is guaranteed. C++ works if the native image
+  ships `g++`. **Java does not** — no JDK on the native Python runtime, so a
+  Java submission returns a clear "toolchain is not installed" error rather
+  than a misleading verdict. `GET /api/v1/health` lists exactly which
+  toolchains the running instance can use. All three work locally under
+  `docker compose up`.
+- **Changing `runtime` in `render.yaml` does not apply to an existing service.**
+  Render pins the runtime at creation, so switching from `docker` to `python`
+  means deleting the service and re-applying the blueprint.
 </details>
 
 <details>
