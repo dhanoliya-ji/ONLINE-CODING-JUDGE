@@ -13,7 +13,11 @@
 #  breaks if the wheel set is incomplete for any reason).
 # =========================================================================
 
-FROM python:3.11-slim
+# The Debian release is pinned deliberately. `python:3.11-slim` follows
+# whatever Debian is current, and that moved from bookworm to trixie - which
+# removed the openjdk-17 packages. Pinning keeps the apt package names below
+# valid instead of letting an upstream retag break the build.
+FROM python:3.11-slim-trixie
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -32,14 +36,19 @@ RUN apt-get update \
 # Runtime dependencies:
 #   libpq5                  - psycopg2 needs it to talk to Postgres
 #   g++                     - compiles C++ submissions
-#   openjdk-17-jdk-headless - compiles and runs Java submissions.
-#     Named explicitly rather than via the `default-jdk-headless` metapackage,
-#     and `-headless` to skip the ~200 MB of GUI libraries a judge never uses.
+#   openjdk-21-jdk-headless - compiles and runs Java submissions. 21 is the
+#     JDK Debian trixie ships; `-headless` skips the GUI libraries a judge
+#     never uses. Named explicitly rather than via `default-jdk-headless` so
+#     the installed version is visible here rather than chosen by the distro.
+#
+# The version checks at the end are load-bearing: without them a missing
+# toolchain would surface as every C++/Java submission failing in production
+# instead of as a failed build.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libpq5 \
         g++ \
-        openjdk-17-jdk-headless \
+        openjdk-21-jdk-headless \
     && rm -rf /var/lib/apt/lists/* \
     && javac -version && g++ --version | head -1
 
