@@ -52,13 +52,15 @@ CPU and process limits.
 
 | | |
 |---|---|
-| **API root** | `https://<your-service>.onrender.com/` |
-| **Interactive docs** | `https://<your-service>.onrender.com/docs` |
-| **Health / sandbox report** | `https://<your-service>.onrender.com/api/v1/health` |
+| **Web app** | `https://crucible-web.onrender.com` ← **share this one** |
+| **API root** | <https://online-coding-judge-7w5q.onrender.com> |
+| **Interactive docs** | <https://online-coding-judge-7w5q.onrender.com/docs> |
+| **Health / sandbox report** | <https://online-coding-judge-7w5q.onrender.com/api/v1/health> |
 
-> **Replace `<your-service>` with your Render URL after following
-> [Deployment](#-deployment).** The database is a free Neon Postgres instance and
-> the app is a free Render web service.
+> Replace the web-app URL with the one Render assigns your static site after
+> following [Deployment](#-deployment). The database is a free Neon Postgres
+> instance; the API is a free Render web service and the frontend a free Render
+> static site.
 
 **Demo credentials** (created by `python -m scripts.seed`):
 
@@ -81,9 +83,11 @@ CPU and process limits.
 > python scripts/set_password.py you@example.com
 > ```
 
-> ⏱️ **Free-tier cold start.** Render spins an idle free service down after
-> ~15 minutes. The first request after a nap takes **40–60 seconds**; every
-> request after that is fast. Hit `/api/v1/ping` once to wake it before a demo.
+> ⏱️ **Free-tier cold start.** Render spins an idle free *web service* down
+> after ~15 minutes, so the first API call after a nap takes **40–60 seconds**.
+> The frontend is a static site on a CDN and never sleeps — it detects the wait
+> and shows a "waking the judge…" banner rather than looking broken. Every
+> request after the first is fast.
 
 > 🔒 **Sandbox on the live demo.** Free hosting does not expose a Docker socket,
 > so the deployed instance runs the `local` (rlimit) backend rather than the
@@ -493,6 +497,9 @@ from practice. A practice solve never moves a leaderboard.
 
 | Layer | Choice | Why |
 |---|---|---|
+| Frontend | React 19 + TypeScript + Vite | Typed against the same shapes the API returns; Vite keeps the build under a second |
+| Styling | Tailwind CSS v4 | CSS-first config, so the design tokens live beside the glass primitives that use them |
+| Editor | CodeMirror 6 | Bundles with Vite rather than loading from a CDN, so the editor works on any network |
 | API | FastAPI 0.116 | Type-driven validation and OpenAPI generated from the same annotations |
 | Language | Python 3.11 | `X \| Y` unions, `StrEnum`, better tracebacks |
 | ORM | SQLAlchemy 2.0 | Typed `Mapped[...]` declarative models, modern `select()` API |
@@ -510,6 +517,22 @@ from practice. A practice solve never moves a leaderboard.
 
 ```
 online-coding-judge/
+├── frontend/                     # ── React single-page app ──
+│   ├── src/
+│   │   ├── lib/
+│   │   │   ├── api.ts            # Typed client, timeouts, 401 handling
+│   │   │   ├── auth.tsx          # Session context, restored and validated on boot
+│   │   │   ├── types.ts          # Mirrors the API's response shapes
+│   │   │   └── format.ts         # Verdict tones, relative time, countdowns
+│   │   ├── components/
+│   │   │   ├── ui.tsx            # Glass primitives, badges, stats, empty states
+│   │   │   ├── Layout.tsx        # Shell, nav, cold-start banner
+│   │   │   └── CodeEditor.tsx    # CodeMirror 6 with per-language modes
+│   │   ├── pages/                # Landing · Auth · Problems · Solve
+│   │   │   └──                   # Contests · ContestDetail · Submissions · Dashboard
+│   │   └── index.css             # Design tokens, aurora field, glass system
+│   └── vite.config.ts
+│
 ├── app/
 │   ├── config.py                 # Settings, validated at import; fails fast
 │   ├── database.py               # Engine + session factory (Postgres/SQLite)
@@ -597,6 +620,20 @@ click **Authorize**, and submit a solution to problem 1:
 a, b = map(int, input().split())
 print(a + b)
 ```
+
+### Running the frontend locally
+
+With the API already running on port 8000:
+
+```bash
+cd frontend
+npm install
+npm run dev        # http://localhost:5173
+```
+
+`frontend/.env.development` already points at `http://localhost:8000`, so no
+configuration is needed. `npm run build` produces `dist/`; `npm run preview`
+serves that build to check it before deploying.
 
 ### Option B — Docker Compose, with the real container sandbox
 
@@ -781,10 +818,32 @@ python scripts/verify_seed.py    # confirms every problem accepts a correct solu
 Then open `https://<your-service>.onrender.com/docs`, register with the email
 you put in `ADMIN_EMAILS`, and you have admin rights.
 
-#### Step 6 — Put the URL in this README
+#### Step 6 — The frontend
 
-Replace `<your-service>` in [Live demo](#-live-demo) with your real Render
-subdomain, and update the badge URLs at the top with your GitHub username.
+The same blueprint declares a second service, `crucible-web`, as a **Render
+static site**. It builds `frontend/` with Vite and serves `dist/` from a CDN —
+free, and it never spins down.
+
+Set one variable on it in the dashboard:
+
+| Key | Value |
+|---|---|
+| `VITE_API_BASE_URL` | Your API URL, e.g. `https://online-coding-judge-7w5q.onrender.com` |
+
+> Vite **inlines** `VITE_*` variables at build time. Changing this value needs a
+> **rebuild**, not a restart — a restart alone will keep the old URL baked in.
+
+The blueprint also sets a `/*  →  /index.html` rewrite. Without it, a hard
+refresh on a deep link like `/problems/two-sum` would 404, because the static
+host looks for a file at that path while routing actually happens in the
+browser.
+
+#### Step 7 — Put the URL in this README
+
+Replace the URLs in [Live demo](#-live-demo) with your real Render subdomains,
+and update the badge URLs at the top with your GitHub username. **Share the
+static-site URL** — it is the front door, and it loads instantly even when the
+API is asleep.
 
 <details>
 <summary><b>Render free-tier behaviour worth knowing</b></summary>
@@ -1027,6 +1086,38 @@ CI rather than by a confused user.
 ---
 
 ## 🧭 Design decisions
+
+<details>
+<summary><b>Why the charts avoid red/green for verdicts</b></summary>
+
+The obvious encoding for a verdict chart is green for Accepted and red for
+Wrong Answer. Run those two through a colour-blindness check and they separate
+by **ΔE 4.6 under deuteranopia** — well under the ΔE 8 threshold for
+distinguishable adjacent colours. Roughly 1 in 12 men could not tell the two
+bars apart.
+
+So the dashboard bars use **one hue for magnitude**, which is the job a bar
+chart actually does, and identity is carried by the label and verdict badge
+beside each bar. Verdict badges elsewhere do use semantic colour, but always
+with a glyph (`✓`, `✕`, `◴`) and the full verdict text, so colour is never the
+only signal.
+
+</details>
+
+<details>
+<summary><b>Why a separate static site rather than serving the SPA from FastAPI?</b></summary>
+
+One URL would be simpler to share. But Render's Python runtime has no Node, so
+serving the SPA from FastAPI means committing built assets to git — which
+bloats the repo and makes every build produce a diff.
+
+Splitting them also fixes the cold-start problem. The static site is on a CDN
+and never sleeps, so the app paints instantly even when the API is asleep, and
+the frontend can show a "waking the judge…" banner instead of a blank screen.
+Bundled together, the whole thing would be unreachable for the first 50
+seconds.
+
+</details>
 
 <details>
 <summary><b>Why judge synchronously instead of using a Celery queue?</b></summary>

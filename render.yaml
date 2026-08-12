@@ -1,20 +1,21 @@
 # =========================================================================
 #  Render Blueprint - https://render.com/docs/blueprint-spec
 #
-#  Deploys on Render's NATIVE PYTHON runtime, not Docker. Render's free tier
-#  does not expose a Docker socket, so the container sandbox could never have
-#  run there anyway; building an image only added a slow, fragile build step
-#  for no isolation benefit. `pip install` on the native runtime is faster and
-#  has far fewer moving parts.
+#  Two services:
+#    1. online-coding-judge  - the FastAPI API, on the native Python runtime
+#    2. crucible-web         - the React frontend, as a static site
 #
-#  The Docker sandbox is still the real one - use `docker compose up` locally
-#  to run submissions with full container isolation.
+#  The API is deployed WITHOUT Docker. Render's free tier exposes no Docker
+#  socket, so the container sandbox could never run there; building an image
+#  only added a slow, fragile build for no isolation benefit. The Docker
+#  sandbox is still the real one - `docker compose up` locally uses it.
 #
 #  DATABASE_URL is deliberately NOT defined here: set it in the Render
 #  dashboard so the credential never lands in version control.
 # =========================================================================
 
 services:
+  # ---------------------------------------------------------------- API --
   - type: web
     name: online-coding-judge
     runtime: python
@@ -25,7 +26,6 @@ services:
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --workers 2
 
-    # Render polls this to decide whether an instance is healthy.
     healthCheckPath: /api/v1/ping
 
     envVars:
@@ -44,6 +44,9 @@ services:
         value: "3.11.9"
       - key: ENVIRONMENT
         value: production
+      # The frontend is served from a different origin, so the browser sends
+      # a preflight on every write. Narrow this to the static site's URL once
+      # it is known, if you want to stop other origins using this API.
       - key: CORS_ORIGINS
         value: "*"
 
@@ -58,3 +61,39 @@ services:
         value: "128"
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "1440"
+
+  # ----------------------------------------------------------- Frontend --
+  - type: web
+    name: crucible-web
+    runtime: static
+    # No `plan` key: Render static sites are always free and reject it.
+    branch: main
+    rootDir: frontend
+
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+
+    envVars:
+      # Vite inlines VITE_* variables at build time, so changing this requires
+      # a rebuild, not just a restart.
+      - key: VITE_API_BASE_URL
+        sync: false          # e.g. https://online-coding-judge-7w5q.onrender.com
+
+    routes:
+      # Single-page app: every unmatched path must return index.html so that
+      # deep links like /problems/two-sum work on a hard refresh.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+    headers:
+      # Vite emits content-hashed filenames, so assets can be cached forever.
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
