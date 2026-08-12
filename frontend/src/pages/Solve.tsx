@@ -11,6 +11,7 @@ import type {
   TestCasePublic,
 } from "../lib/types";
 import { CodeEditor, STARTERS } from "../components/CodeEditor";
+import { Markdown } from "../components/Markdown";
 import {
   Alert,
   Badge,
@@ -180,13 +181,13 @@ export function Solve() {
         <Card solid className="overflow-hidden">
           <div className="max-h-[calc(100dvh-14rem)] space-y-6 overflow-y-auto p-6 lg:sticky lg:top-20">
             <Section title="Problem">
-              <p className="whitespace-pre-wrap">{problem.description}</p>
+              <Markdown text={problem.description} />
             </Section>
             <Section title="Input">
-              <p className="whitespace-pre-wrap">{problem.input_format}</p>
+              <Markdown text={problem.input_format} />
             </Section>
             <Section title="Output">
-              <p className="whitespace-pre-wrap">{problem.output_format}</p>
+              <Markdown text={problem.output_format} />
             </Section>
             <Section title="Constraints">
               <p className="whitespace-pre-wrap font-mono text-[13px]">

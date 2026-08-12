@@ -361,12 +361,12 @@ class _MemoryMonitor(threading.Thread):
         super().__init__(daemon=True)
         self._container = container
         self._peak_bytes = 0
-        self._stop = threading.Event()
+        self._stop_event = threading.Event()
 
     def run(self) -> None:  # pragma: no cover - timing dependent
         try:
             for stat in self._container.stats(stream=True, decode=True):
-                if self._stop.is_set():
+                if self._stop_event.is_set():
                     break
                 mem = stat.get("memory_stats") or {}
                 usage = mem.get("max_usage") or mem.get("usage") or 0
@@ -376,7 +376,7 @@ class _MemoryMonitor(threading.Thread):
 
     def stop(self) -> int:
         """Signal the sampler to finish and return the peak in kilobytes."""
-        self._stop.set()
+        self._stop_event.set()
         self.join(timeout=0.5)
         return self._peak_bytes // 1024
 

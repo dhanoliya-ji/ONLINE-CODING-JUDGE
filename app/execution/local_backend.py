@@ -24,9 +24,10 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import signal
 import subprocess
-import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -175,28 +176,46 @@ class LocalBackend(SandboxBackend):
             else None
         )
 
-        baseline_rss = _children_peak_rss_kb()
         started = time.perf_counter()
+        monitor: _PeakMemoryMonitor | None = None
 
         try:
-            completed = subprocess.run(
+            process = subprocess.Popen(  # noqa: S603
                 argv,
                 cwd=workdir,
-                input=request.stdin,
-                capture_output=True,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                timeout=timeout_s,
                 env=_sandbox_env(),
                 preexec_fn=preexec,  # noqa: PLW1509 - intentional, POSIX only
                 start_new_session=IS_POSIX,
             )
+
+            # Sample this specific child's peak RSS while it runs. The previous
+            # approach diffed getrusage(RUSAGE_CHILDREN).ru_maxrss, which is a
+            # high-water mark across *every* child the process has ever reaped —
+            # so it reported 0 for any run that did not beat the all-time peak.
+            monitor = _PeakMemoryMonitor(process.pid)
+            monitor.start()
+
+            stdout_text, stderr_text = process.communicate(
+                input=request.stdin, timeout=timeout_s
+            )
+            returncode = process.returncode
+            memory_kb = monitor.stop()
+
         except subprocess.TimeoutExpired:
+            if monitor is not None:
+                memory_kb = monitor.stop()
+            _terminate_tree(process)
             return ExecutionResult(
                 outcome=Outcome.TIMEOUT,
                 duration_ms=round(timeout_s * 1000, 2),
                 exit_code=-1,
+                memory_kb=memory_kb if monitor is not None else 0,
                 backend=self.name,
             )
         except MemoryError:
@@ -219,27 +238,26 @@ class LocalBackend(SandboxBackend):
             )
 
         duration_ms = (time.perf_counter() - started) * 1000
-        memory_kb = max(_children_peak_rss_kb() - baseline_rss, 0)
 
-        stdout, stdout_clipped = truncate(completed.stdout, request.max_output_bytes)
-        stderr, _ = truncate(completed.stderr, request.max_output_bytes)
+        stdout, stdout_clipped = truncate(stdout_text, request.max_output_bytes)
+        stderr, _ = truncate(stderr_text, request.max_output_bytes)
 
         if stdout_clipped:
             return ExecutionResult(
                 outcome=Outcome.OUTPUT_EXCEEDED,
                 stdout=stdout,
                 stderr=stderr,
-                exit_code=completed.returncode,
+                exit_code=returncode,
                 duration_ms=round(duration_ms, 2),
                 memory_kb=memory_kb,
                 backend=self.name,
             )
 
-        if completed.returncode != 0:
+        if returncode != 0:
             # A process killed by SIGSEGV/SIGKILL after hitting RLIMIT_AS, or a
             # JVM that reports an OOM, is a memory violation rather than a plain
             # runtime error.
-            if _looks_like_oom(completed.returncode, stderr, memory_kb, request):
+            if _looks_like_oom(returncode, stderr, memory_kb, request):
                 outcome = Outcome.MEMORY_EXCEEDED
             else:
                 outcome = Outcome.RUNTIME_ERROR
@@ -247,7 +265,7 @@ class LocalBackend(SandboxBackend):
                 outcome=outcome,
                 stdout=stdout,
                 stderr=stderr,
-                exit_code=completed.returncode,
+                exit_code=returncode,
                 duration_ms=round(duration_ms, 2),
                 memory_kb=memory_kb,
                 backend=self.name,
@@ -344,13 +362,61 @@ def _build_preexec(spec: LanguageSpec, request: ExecutionRequest):  # pragma: no
     return _limit
 
 
-def _children_peak_rss_kb() -> int:
-    """Peak RSS of reaped children, in kilobytes."""
-    if resource is None:  # pragma: no cover - Windows
-        return 0
-    usage = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
-    # Linux reports kilobytes, macOS reports bytes.
-    return int(usage) if sys.platform != "darwin" else int(usage) // 1024
+class _PeakMemoryMonitor(threading.Thread):
+    """Samples one process's peak resident memory while it runs.
+
+    On Linux, ``/proc/<pid>/status`` exposes ``VmHWM`` — the kernel's own
+    high-water mark for that process — so a single read after the fact would be
+    exact. It is polled instead because the file disappears the moment the
+    process exits, and a short-lived program can finish before the first read.
+
+    Elsewhere there is no cheap per-process equivalent, so this reports 0 and
+    ``/health`` advertises memory reporting as unavailable.
+    """
+
+    def __init__(self, pid: int) -> None:
+        super().__init__(daemon=True)
+        self._pid = pid
+        self._peak_kb = 0
+        self._stop_event = threading.Event()
+
+    def run(self) -> None:  # pragma: no cover - timing dependent
+        status_path = f"/proc/{self._pid}/status"
+        while not self._stop_event.is_set():
+            try:
+                with open(status_path, encoding="ascii") as handle:
+                    for line in handle:
+                        if line.startswith("VmHWM:"):
+                            self._peak_kb = max(
+                                self._peak_kb, int(line.split()[1])
+                            )
+                            break
+            except (OSError, ValueError, IndexError):
+                # The process exited, or this is not Linux. Either way the last
+                # sample we took is the best answer available.
+                break
+            self._stop_event.wait(0.01)
+
+    def stop(self) -> int:
+        self._stop_event.set()
+        self.join(timeout=0.3)
+        return self._peak_kb
+
+
+def _terminate_tree(process: subprocess.Popen) -> None:
+    """Kill the whole process group, not just the direct child."""
+    try:
+        if IS_POSIX:
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+        else:
+            process.kill()
+    except (OSError, ProcessLookupError):
+        pass
+    finally:
+        try:
+            process.wait(timeout=2)
+        except Exception:  # noqa: BLE001 - best-effort reap
+            pass
 
 
 def _looks_like_oom(
