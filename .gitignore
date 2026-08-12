@@ -22,6 +22,13 @@ env/
 .env.*
 !.env.example
 
+# ...but Vite's VITE_* variables are inlined into client-side JavaScript, so
+# they are public by definition and cannot hold a secret. The API base URL is
+# build-time configuration and must be committed, or a CI build has no value to
+# use and silently falls back to localhost.
+!frontend/.env.production
+!frontend/.env.development
+
 # Local databases
 *.db
 *.sqlite3
