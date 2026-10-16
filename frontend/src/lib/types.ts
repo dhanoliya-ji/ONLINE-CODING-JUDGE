@@ -108,6 +108,7 @@ export interface Submission {
   error_message?: string | null;
   failed_test_index?: number | null;
   problem_title?: string | null;
+  problem_slug?: string | null;
   backend?: string | null;
   test_results?: TestCaseResult[];
 }
@@ -214,6 +215,8 @@ export interface Dashboard {
   current_streak: number;
   longest_streak: number;
   tag_progress: { slug: string; name: string; solved: number; total: number }[];
+  global_rank: number | null;
+  member_since: string | null;
 }
 
 export interface Facets {

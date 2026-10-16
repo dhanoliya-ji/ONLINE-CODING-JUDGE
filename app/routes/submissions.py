@@ -29,6 +29,7 @@ from app.schemas.submission import (
     SubmissionResponse,
     SubmissionSummary,
     TestCaseResult,
+    with_problem_titles,
 )
 
 logger = logging.getLogger(__name__)
@@ -208,7 +209,7 @@ def my_submissions(
     )
 
     return Page[SubmissionSummary](
-        items=[SubmissionSummary.model_validate(row) for row in rows],
+        items=with_problem_titles(db, [SubmissionSummary.model_validate(row) for row in rows]),
         total=total,
         limit=limit,
         offset=offset,

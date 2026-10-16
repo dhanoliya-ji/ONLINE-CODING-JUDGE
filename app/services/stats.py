@@ -26,7 +26,7 @@ from app.schemas.dashboard import (
     TagProgress,
     VerdictCount,
 )
-from app.schemas.submission import SubmissionSummary
+from app.schemas.submission import SubmissionSummary, with_problem_titles
 
 RECENT_LIMIT = 10
 TOP_TAGS = 12
@@ -144,10 +144,26 @@ def build_dashboard(db: Session, user: User) -> DashboardResponse:
             )
             for language, count, accepted_count in language_rows
         ],
-        recent_submissions=[SubmissionSummary.model_validate(s) for s in recent],
+        recent_submissions=with_problem_titles(db, [SubmissionSummary.model_validate(s) for s in recent]),
         **_activity(db, user),
         tag_progress=_tag_progress(db, user),
+        global_rank=_global_rank(db, problems_solved),
+        member_since=user.created_at.date().isoformat() if user.created_at else None,
     )
+
+
+def _global_rank(db: Session, solved: int) -> int | None:
+    """1 + the number of users who have solved more problems."""
+    if solved == 0:
+        return None
+    per_user = (
+        select(Submission.user_id, func.count(distinct(Submission.problem_id)).label("solved"))
+        .where(Submission.verdict == Verdict.ACCEPTED.value)
+        .group_by(Submission.user_id)
+        .subquery()
+    )
+    ahead = db.scalar(select(func.count()).select_from(per_user).where(per_user.c.solved > solved))
+    return int(ahead or 0) + 1
 
 
 def _activity(db: Session, user: User) -> dict:

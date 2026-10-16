@@ -80,3 +80,4 @@ def test_activity_streaks_and_topics(client, admin_headers, user_headers, proble
     assert data["activity"][0]["submissions"] == 1 and data["activity"][0]["accepted"] == 1
     assert data["current_streak"] == 1 and data["longest_streak"] == 1
     assert data["tag_progress"] == [{"slug": "math", "name": "Math", "solved": 1, "total": 1}]
+    assert data["global_rank"] == 1 and data["member_since"]

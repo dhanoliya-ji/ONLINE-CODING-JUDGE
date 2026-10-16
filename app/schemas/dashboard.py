@@ -57,4 +57,7 @@ class DashboardResponse(BaseModel):
     activity: list[DayActivity] = []
     current_streak: int = Field(0, description="Consecutive days up to today (or yesterday) with a submission")
     longest_streak: int = 0
+    #: Position on the global leaderboard (by problems solved), if ranked.
+    global_rank: int | None = None
+    member_since: str | None = None
     tag_progress: list[TagProgress] = []
