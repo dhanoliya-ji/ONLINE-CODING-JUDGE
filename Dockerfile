@@ -17,7 +17,9 @@
 # whatever Debian is current, and that moved from bookworm to trixie - which
 # removed the openjdk-17 packages. Pinning keeps the apt package names below
 # valid instead of letting an upstream retag break the build.
-FROM python:3.11-slim-trixie
+# Pinned to a digest as well as a tag: a tag can be re-pointed, a digest
+# cannot. Dependabot (docker ecosystem) bumps the digest when the tag moves.
+FROM python:3.11-slim-trixie@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -56,6 +58,9 @@ WORKDIR /app
 
 # Dependencies before source, so a code change does not invalidate this layer.
 COPY requirements.txt .
+# The base image ships pip and setuptools with known CVEs (setuptools vendors
+# jaraco.context and wheel); upgrade them before installing anything.
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .

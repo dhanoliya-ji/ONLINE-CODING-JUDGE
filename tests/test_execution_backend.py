@@ -131,3 +131,52 @@ class TestLocalBackendBehaviour:
 
         monkeypatch.setattr(local_backend.shutil, "which", lambda _name: None)
         assert local_backend._which("python") == sys.executable
+
+
+class TestDockerSandboxStaging:
+    """The submission directory is world-writable (the container runs as
+    `nobody`), so it must sit inside a directory no other host user can enter."""
+
+    def test_world_writable_box_lives_inside_a_private_directory(self, monkeypatch):
+        import os
+        import stat
+        import sys
+
+        import pytest
+
+        if sys.platform == "win32":
+            pytest.skip("POSIX permission bits")
+
+        from app.execution import docker_backend as db
+
+        seen = {}
+
+        def capture(self, workdir, spec, request):
+            seen["box"] = os.stat(workdir).st_mode
+            seen["parent"] = os.stat(os.path.dirname(workdir)).st_mode
+            raise OSError("stop after staging")
+
+        monkeypatch.setattr(db.DockerBackend, "_materialise", capture)
+        monkeypatch.setattr(db.DockerBackend, "_get_client", lambda self: object())
+
+        result = db.DockerBackend().run(ExecutionRequest(language="python", source_code="print(1)"))
+
+        assert "parent" in seen, result.detail
+        assert stat.S_IMODE(seen["parent"]) & 0o077 == 0, oct(seen["parent"])
+
+    def test_a_real_submission_runs_in_the_sandbox(self):
+        import pytest
+
+        backend = DockerBackend()
+        if not backend.is_available():
+            pytest.skip("Docker is not available on this host")
+
+        result = backend.run(
+            ExecutionRequest(
+                language="python",
+                source_code="import sys\nprint(sum(map(int, sys.stdin.read().split())))\n",
+                stdin="2 40\n",
+            )
+        )
+        assert result.outcome is Outcome.OK, result.detail
+        assert result.stdout.strip() == "42"

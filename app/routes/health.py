@@ -6,6 +6,7 @@ is healthy; it must stay cheap and must not require authentication.
 
 from __future__ import annotations
 
+import logging
 import time
 
 from fastapi import APIRouter, Depends, Response, status
@@ -16,6 +17,8 @@ from app.config import settings
 from app.dependencies.database import get_db
 from app.execution.engine import backend_status
 from app.execution.languages import supported_languages
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["System"])
 
@@ -31,8 +34,12 @@ def health(response: Response, db: Session = Depends(get_db)) -> dict:
             "dialect": db.bind.dialect.name if db.bind else "unknown",
             "latency_ms": round((time.perf_counter() - started) * 1000, 2),
         }
-    except Exception as exc:  # noqa: BLE001 - the payload reports the failure
-        database = {"connected": False, "error": f"{type(exc).__name__}: {exc}"}
+    except Exception:  # noqa: BLE001 - the payload reports the failure
+        # The detail goes to the server log, not the response. This endpoint is
+        # public, and a driver error can name the database host, user and
+        # driver - useful to an attacker, useless to a health check.
+        logger.exception("Health check: database unreachable")
+        database = {"connected": False, "error": "database unreachable"}
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 
     return {
