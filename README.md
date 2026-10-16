@@ -12,12 +12,17 @@ process limits.
 
 [![CI](https://github.com/dhanoliya-ji/ONLINE-CODING-JUDGE/actions/workflows/ci.yml/badge.svg)](https://github.com/dhanoliya-ji/ONLINE-CODING-JUDGE/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.116-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.143-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2B-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-sandbox-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/tests-88%20passing-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-94%20passing-brightgreen)](#-testing)
 [![License](https://img.shields.io/badge/license-MIT-a78bfa)](LICENSE)
+
+[![CodeQL](https://github.com/dhanoliya-ji/ONLINE-CODING-JUDGE/actions/workflows/codeql.yml/badge.svg)](https://github.com/dhanoliya-ji/ONLINE-CODING-JUDGE/actions/workflows/codeql.yml)
+[![codecov](https://codecov.io/gh/dhanoliya-ji/ONLINE-CODING-JUDGE/branch/main/graph/badge.svg)](https://codecov.io/gh/dhanoliya-ji/ONLINE-CODING-JUDGE)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/dhanoliya-ji/ONLINE-CODING-JUDGE/badge)](https://scorecard.dev/viewer/?uri=github.com/dhanoliya-ji/ONLINE-CODING-JUDGE)
+[![Release](https://img.shields.io/github/v/release/dhanoliya-ji/ONLINE-CODING-JUDGE)](https://github.com/dhanoliya-ji/ONLINE-CODING-JUDGE/releases/latest)
 
 ### **[▶ Open the live demo](https://crucible-web.onrender.com)**
 
@@ -199,7 +204,7 @@ locally and still deploy to a free host that forbids it.
 - CodeMirror 6 editor, drafts persisted locally
 - Cold-start detection and messaging
 - `/health` reporting DB and sandbox status
-- 88 automated tests, GitHub Actions CI
+- 94 automated tests, GitHub Actions CI
 - Reproducible, script-generated screenshots
 
 </td></tr>
@@ -321,7 +326,7 @@ This README is the overview. The detail lives in `docs/`:
 ## 🧪 Testing
 
 ```bash
-pytest                       # 88 tests
+pytest                       # 94 tests
 pytest -v                    # verbose
 pytest tests/test_judging.py # one module
 pytest -k leaderboard        # by name
