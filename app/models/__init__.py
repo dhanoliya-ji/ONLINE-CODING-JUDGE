@@ -18,6 +18,7 @@ from app.models.enums import (
 )
 from app.models.problem import Problem
 from app.models.submission import Submission
+from app.models.tag import Tag, problem_tags
 from app.models.test_case import TestCase
 from app.models.user import User
 
@@ -34,6 +35,8 @@ __all__ = [
     "Language",
     "Problem",
     "Submission",
+    "Tag",
+    "problem_tags",
     "SubmissionStatus",
     "TestCase",
     "User",

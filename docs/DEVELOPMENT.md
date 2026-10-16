@@ -311,15 +311,22 @@ New routers are registered in `app/routes/__init__.py`.
 
 ### Change the schema
 
-`Base.metadata.create_all()` runs on startup and creates **missing tables only**.
-It will not alter an existing table. In development, drop and re-seed:
+Schema changes are Alembic migrations, applied automatically on start-up
+(and by `python -m app.migrate`). After changing a model:
+
+```bash
+alembic revision --autogenerate -m "describe the change"
+```
+
+Review the generated file in `migrations/versions/` (autogenerate cannot see
+everything, e.g. expression indexes), then run the tests:
+`tests/test_migrations.py` fails if the models and the migrations disagree.
+
+To start again from an empty database in development:
 
 ```bash
 python -m scripts.seed --reset
 ```
-
-For production data you need Alembic — see
-[Architecture](ARCHITECTURE.md#design-decisions).
 
 ### Promote a user to admin
 

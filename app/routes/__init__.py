@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.routes import (
     auth,
+    catalogue,
     coach,
     contest_problems,
     contests,
@@ -21,6 +22,8 @@ api_router = APIRouter()
 # routes use a deeper path, so they never collide.
 api_router.include_router(health.router)
 api_router.include_router(auth.router)
+# Before `problems`: its /problems/{identifier} would capture /problems/daily.
+api_router.include_router(catalogue.router)
 api_router.include_router(problems.router)
 api_router.include_router(coach.router)
 api_router.include_router(test_cases.router)

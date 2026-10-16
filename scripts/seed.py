@@ -18,10 +18,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from sqlalchemy import select  # noqa: E402
+from sqlalchemy import select, text  # noqa: E402
 
 from app.config import settings  # noqa: E402
 from app.database import SessionLocal, engine  # noqa: E402
+from app.migrate import upgrade_database  # noqa: E402
 from app.models import (  # noqa: E402
     Base,
     Contest,
@@ -194,8 +195,10 @@ def seed(reset: bool = False) -> None:
     if reset:
         print("Dropping every table ...")
         Base.metadata.drop_all(bind=engine)
+        with engine.begin() as connection:
+            connection.execute(text("DROP TABLE IF EXISTS alembic_version"))
 
-    Base.metadata.create_all(bind=engine)
+    upgrade_database(engine)
 
     with SessionLocal() as db:
         admin = _seed_admin(db)

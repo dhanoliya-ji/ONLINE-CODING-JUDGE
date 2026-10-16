@@ -6,6 +6,7 @@ from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+from app.models.tag import Tag, problem_tags
 
 if TYPE_CHECKING:
     from app.models.contest_problem import ContestProblem
@@ -51,6 +52,16 @@ class Problem(TimestampMixin, Base):
 
     created_by: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    # Provenance, shown on every imported problem: where it comes from, a
+    # link back to the original, and the licence it is redistributed under.
+    source: Mapped[str | None] = mapped_column(String(80), index=True, nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    license: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
+    tags: Mapped[list[Tag]] = relationship(
+        secondary=problem_tags, lazy="selectin", order_by=Tag.name
     )
 
     test_cases: Mapped[list["TestCase"]] = relationship(

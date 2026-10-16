@@ -437,14 +437,18 @@ already queue-shaped: moving execution to a worker means changing who calls
 </details>
 
 <details>
-<summary><b>Why <code>create_all()</code> rather than Alembic?</b></summary>
+<summary><b>How does the schema change without losing data?</b></summary>
 
-`create_all()` is idempotent and runs on startup, so a fresh Neon database works
-with zero manual steps — exactly what a deployable portfolio project needs. The
-trade-off is honest: it creates missing tables but never alters existing ones,
-so a production system preserving data through a schema change needs Alembic.
-Shipping a hand-written migration that silently drifts from the models would be
-worse than not having one.
+Alembic migrations in `migrations/`, applied on every start-up by
+`app/migrate.py`, so a fresh Neon database and every later schema change both
+deploy with zero manual steps. The workers migrate one at a time under a
+Postgres advisory lock.
+
+The project began on `create_all()`. A database from that era has tables but
+no migration history; it is stamped at the baseline revision and upgraded
+from there, never recreated. A test rebuilds that situation and checks the
+data survives, and another fails CI if the models and migrations ever
+disagree.
 
 </details>
 

@@ -87,6 +87,49 @@ jobs:
           # must never fail the build.
           fail_ci_if_error: false
 
+  postgres:
+    name: Test suite (Postgres)
+    # Production runs on Postgres (Neon). The main job uses SQLite for speed;
+    # this one runs the same suite against a real Postgres, which is the only
+    # place full-text search, the migration lock and the search index run.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: judge
+          POSTGRES_PASSWORD: judge
+          POSTGRES_DB: judge
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U judge"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://judge:judge@localhost:5432/judge
+      SECRET_KEY: ci-secret-key-not-used-anywhere-else
+      EXECUTION_BACKEND: local
+      ADMIN_EMAILS: admin@example.com
+      ENVIRONMENT: development
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Migrate an empty database, as a fresh deploy does
+        run: python -m app.migrate
+      - name: Run tests
+        # The per-language sandbox tests do not touch the database and
+        # already run in the main job.
+        run: pytest -q -p no:cacheprovider --ignore=tests/test_languages.py -o addopts=""
+      - name: Seed, then boot-migrate the seeded database
+        run: |
+          python -m scripts.seed --reset
+          python scripts/verify_seed.py
+          python -m app.migrate
+
   docker:
     name: Docker image builds
     runs-on: ubuntu-latest
