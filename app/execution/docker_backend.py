@@ -178,6 +178,7 @@ class DockerBackend(SandboxBackend):
             workdir=workdir,
             image=spec.docker_image,
             argv=spec.compile_cmd,
+            env=spec.env,
             stdin_file=None,
             timeout_s=settings.EXECUTION_COMPILE_TIMEOUT_S,
             # Compilers are memory hungry; give them headroom but stay bounded.
@@ -220,6 +221,7 @@ class DockerBackend(SandboxBackend):
             workdir=workdir,
             image=spec.docker_image,
             argv=spec.render_run_cmd(request.memory_limit_mb),
+            env=spec.env,
             stdin_file="input.txt",
             timeout_s=request.time_limit_ms / 1000,
             memory_limit_mb=request.memory_limit_mb,
@@ -242,6 +244,7 @@ class DockerBackend(SandboxBackend):
         memory_limit_mb: int,
         writable: bool,
         max_output_bytes: int,
+        env: dict[str, str] | None = None,
     ) -> ExecutionResult:
         command = " ".join(shlex.quote(part) for part in argv)
         if stdin_file:
@@ -286,6 +289,7 @@ class DockerBackend(SandboxBackend):
                     "HOME": "/tmp",
                     "PYTHONDONTWRITEBYTECODE": "1",
                     "PYTHONPYCACHEPREFIX": "/tmp/pycache",
+                    **(env or {}),
                 },
             )
 

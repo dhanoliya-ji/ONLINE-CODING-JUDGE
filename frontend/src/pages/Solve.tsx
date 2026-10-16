@@ -22,7 +22,18 @@ import {
   VerdictBadge,
 } from "../components/ui";
 
-const LANGUAGES: LanguageId[] = ["python", "cpp", "java"];
+const LANGUAGES: LanguageId[] = [
+  "python",
+  "c",
+  "cpp",
+  "java",
+  "javascript",
+  "typescript",
+  "go",
+  "rust",
+  "ruby",
+  "php",
+];
 
 const draftKey = (slug: string, language: string) =>
   `crucible.draft.${slug}.${language}`;
@@ -242,27 +253,22 @@ export function Solve() {
         <div className="space-y-4">
           <Card solid className="overflow-hidden">
             <div className="flex flex-wrap items-center gap-2 border-b border-white/8 px-4 py-3">
-              <div
-                className="flex gap-1 rounded-lg border border-white/10 bg-white/5 p-1"
-                role="group"
-                aria-label="Language"
+              {/* A select, not a button group: ten languages do not fit a row. */}
+              <label htmlFor="language" className="sr-only">
+                Language
+              </label>
+              <select
+                id="language"
+                value={language}
+                onChange={(event) => setLanguage(event.target.value as LanguageId)}
+                className="min-h-9 rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-semibold text-violet-50"
               >
                 {LANGUAGES.map((id) => (
-                  <button
-                    key={id}
-                    onClick={() => setLanguage(id)}
-                    aria-pressed={language === id}
-                    className={[
-                      "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
-                      language === id
-                        ? "bg-white/12 text-violet-50"
-                        : "text-violet-200/55 hover:text-violet-100",
-                    ].join(" ")}
-                  >
+                  <option key={id} value={id} className="bg-[#1b1530]">
                     {LANGUAGE_LABELS[id]}
-                  </button>
+                  </option>
                 ))}
-              </div>
+              </select>
 
               <button
                 onClick={() => persistDraft(STARTERS[language])}

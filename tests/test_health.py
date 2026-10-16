@@ -9,7 +9,9 @@ def test_health_reports_database_and_execution_backend(client):
     assert body["status"] == "ok"
     assert body["database"]["connected"] is True
     assert body["execution"]["active"] in {"docker", "local"}
-    assert set(body["languages"]) == {"python", "cpp", "java"}
+    assert set(body["languages"]) == {
+        "python", "c", "cpp", "java", "javascript", "typescript", "go", "rust", "ruby", "php",
+    }
 
 
 def test_ping_is_cheap_and_public(client):

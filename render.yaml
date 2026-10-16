@@ -2,13 +2,15 @@
 #  Render Blueprint - https://render.com/docs/blueprint-spec
 #
 #  Two services:
-#    1. online-coding-judge  - the FastAPI API, on the native Python runtime
+#    1. online-coding-judge  - the FastAPI API, built from the Dockerfile
 #    2. crucible-web         - the React frontend, as a static site
 #
-#  The API is deployed WITHOUT Docker. Render's free tier exposes no Docker
-#  socket, so the container sandbox could never run there; building an image
-#  only added a slow, fragile build for no isolation benefit. The Docker
-#  sandbox is still the real one - `docker compose up` locally uses it.
+#  The API runs as a Docker image, but NOT with the Docker sandbox: Render's
+#  free tier exposes no Docker socket, so submissions run in the rlimit
+#  sandbox (EXECUTION_BACKEND=local) inside the container. The image is what
+#  carries the compilers: the native Python runtime had Python and g++ but
+#  no Java -- every Java submission failed -- and no Node, Go, Rust, Ruby or
+#  PHP. The Docker sandbox is still the real one: `docker compose up` locally.
 #
 #  DATABASE_URL is deliberately NOT defined here: set it in the Render
 #  dashboard so the credential never lands in version control.
@@ -18,13 +20,14 @@ services:
   # ---------------------------------------------------------------- API --
   - type: web
     name: online-coding-judge
-    runtime: python
+    runtime: docker
     plan: free
     region: oregon
     branch: main
 
-    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --workers 2
+    # The Dockerfile's CMD starts uvicorn on $PORT, which Render sets.
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
 
     healthCheckPath: /api/v1/ping
 
@@ -40,8 +43,6 @@ services:
         generateValue: true
 
       # ---- Runtime -------------------------------------------------------
-      - key: PYTHON_VERSION
-        value: "3.11.9"
       - key: ENVIRONMENT
         value: production
       # The frontend is served from a different origin, so the browser sends

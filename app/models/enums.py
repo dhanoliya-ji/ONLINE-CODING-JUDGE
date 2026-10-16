@@ -24,8 +24,15 @@ class Difficulty(StrEnum):
 
 class Language(StrEnum):
     PYTHON = "python"
+    C = "c"
     CPP = "cpp"
     JAVA = "java"
+    JAVASCRIPT = "javascript"
+    TYPESCRIPT = "typescript"
+    GO = "go"
+    RUST = "rust"
+    RUBY = "ruby"
+    PHP = "php"
 
 
 class SubmissionStatus(StrEnum):

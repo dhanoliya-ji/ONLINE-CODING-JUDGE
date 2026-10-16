@@ -138,7 +138,7 @@ class LocalBackend(SandboxBackend):
                 encoding="utf-8",
                 errors="replace",
                 timeout=settings.EXECUTION_COMPILE_TIMEOUT_S,
-                env=_sandbox_env(),
+                env=_sandbox_env(spec),
             )
         except subprocess.TimeoutExpired:
             return ExecutionResult(
@@ -190,7 +190,7 @@ class LocalBackend(SandboxBackend):
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                env=_sandbox_env(),
+                env=_sandbox_env(spec),
                 preexec_fn=preexec,  # noqa: PLW1509 - intentional, POSIX only
                 start_new_session=IS_POSIX,
             )
@@ -313,7 +313,13 @@ def _resolve_argv(argv: list[str], workdir: str) -> list[str]:
     return resolved
 
 
-def _sandbox_env() -> dict[str, str]:
+# Inherited from the server's environment when set: the Docker image points
+# GOCACHE at a cache it warmed at build time, so the first Go submission does
+# not spend its compile budget rebuilding the standard library.
+_PASSTHROUGH_ENV = ("GOCACHE", "GOROOT")
+
+
+def _sandbox_env(spec: LanguageSpec | None = None) -> dict[str, str]:
     """A deliberately minimal environment for the child process."""
     env = {
         "PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"),
@@ -326,6 +332,11 @@ def _sandbox_env() -> dict[str, str]:
         for key in ("SYSTEMROOT", "SystemRoot", "TEMP", "TMP", "COMSPEC"):
             if key in os.environ:
                 env[key] = os.environ[key]
+    for key in _PASSTHROUGH_ENV:
+        if key in os.environ:
+            env[key] = os.environ[key]
+    if spec is not None:
+        env.update(spec.env)
     return env
 
 

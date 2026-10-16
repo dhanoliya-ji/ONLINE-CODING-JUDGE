@@ -42,8 +42,15 @@ export const DIFFICULTY_CLASSES: Record<Difficulty, string> = {
 
 export const LANGUAGE_LABELS: Record<string, string> = {
   python: "Python 3.11",
+  c: "C17",
   cpp: "C++17",
   java: "Java 21",
+  javascript: "JavaScript (Node 24)",
+  typescript: "TypeScript (Node 24)",
+  go: "Go 1.24",
+  rust: "Rust 1.85",
+  ruby: "Ruby 3.3",
+  php: "PHP 8.4",
 };
 
 export function formatDate(iso: string): string {

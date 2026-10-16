@@ -31,6 +31,8 @@ class LanguageSpec:
     supports_address_space_limit: bool = True
     #: Extra argv injected before ``run_cmd`` args, templated with the limits.
     memory_flag_template: list[str] = field(default_factory=list)
+    #: Extra environment for both compiling and running, on either backend.
+    env: dict[str, str] = field(default_factory=dict)
 
     @property
     def needs_compile(self) -> bool:
@@ -93,6 +95,89 @@ LANGUAGES: dict[str, LanguageSpec] = {
         artifact="Main.class",
         supports_address_space_limit=False,
         memory_flag_template=["-Xmx{memory_mb}m", "-XX:+UseSerialGC", "-Xss64m"],
+    ),
+    Language.C.value: LanguageSpec(
+        id=Language.C.value,
+        display_name="C17 (GCC)",
+        source_filename="solution.c",
+        compile_cmd=[
+            "gcc", "-std=c17", "-O2", "-pipe", "-static", "-s",
+            "-o", "solution", "solution.c", "-lm",
+        ],
+        run_cmd=["./solution"],
+        docker_image="gcc:13",
+        local_requirements=("gcc",),
+        artifact="solution",
+    ),
+    # JavaScript and TypeScript share Node.js. V8 reserves a large virtual
+    # address space up front, so -- like the JVM -- it cannot run under
+    # RLIMIT_AS and caps its own heap instead.
+    Language.JAVASCRIPT.value: LanguageSpec(
+        id=Language.JAVASCRIPT.value,
+        display_name="JavaScript (Node.js 24)",
+        source_filename="solution.js",
+        # A syntax check, so a typo is a Compilation Error, not a Runtime Error.
+        compile_cmd=["node", "--check", "solution.js"],
+        run_cmd=["node", "solution.js"],
+        docker_image="node:24-slim",
+        local_requirements=("node",),
+        supports_address_space_limit=False,
+        memory_flag_template=["--max-old-space-size={memory_mb}", "--stack-size=65500"],
+    ),
+    # Node 24 strips TypeScript types natively, so there is no tsc step: it
+    # runs "erasable" TypeScript (no enums or namespaces) as fast as JS.
+    Language.TYPESCRIPT.value: LanguageSpec(
+        id=Language.TYPESCRIPT.value,
+        display_name="TypeScript (Node.js 24)",
+        source_filename="solution.ts",
+        compile_cmd=None,
+        run_cmd=["node", "solution.ts"],
+        docker_image="node:24-slim",
+        local_requirements=("node",),
+        supports_address_space_limit=False,
+        memory_flag_template=["--max-old-space-size={memory_mb}", "--stack-size=65500"],
+        env={"NODE_NO_WARNINGS": "1"},
+    ),
+    Language.GO.value: LanguageSpec(
+        id=Language.GO.value,
+        display_name="Go 1.24",
+        source_filename="main.go",
+        compile_cmd=["go", "build", "-o", "solution", "main.go"],
+        run_cmd=["./solution"],
+        docker_image="golang:1.24",
+        local_requirements=("go",),
+        artifact="solution",
+        # Never fetch a toolchain or a module: a submission is one file, and
+        # the sandbox has no business on the network.
+        env={"GOTOOLCHAIN": "local", "GOPROXY": "off", "CGO_ENABLED": "0"},
+    ),
+    Language.RUST.value: LanguageSpec(
+        id=Language.RUST.value,
+        display_name="Rust 1.85",
+        source_filename="main.rs",
+        compile_cmd=["rustc", "-O", "--edition", "2021", "-o", "solution", "main.rs"],
+        run_cmd=["./solution"],
+        docker_image="rust:1.85-slim",
+        local_requirements=("rustc",),
+        artifact="solution",
+    ),
+    Language.RUBY.value: LanguageSpec(
+        id=Language.RUBY.value,
+        display_name="Ruby 3.3",
+        source_filename="solution.rb",
+        compile_cmd=["ruby", "-c", "solution.rb"],
+        run_cmd=["ruby", "solution.rb"],
+        docker_image="ruby:3.3-slim",
+        local_requirements=("ruby",),
+    ),
+    Language.PHP.value: LanguageSpec(
+        id=Language.PHP.value,
+        display_name="PHP 8.4",
+        source_filename="solution.php",
+        compile_cmd=["php", "-l", "solution.php"],
+        run_cmd=["php", "solution.php"],
+        docker_image="php:8.4-cli",
+        local_requirements=("php",),
     ),
 }
 

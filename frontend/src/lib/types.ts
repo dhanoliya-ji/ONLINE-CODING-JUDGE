@@ -1,5 +1,15 @@
 export type Difficulty = "Easy" | "Medium" | "Hard";
-export type LanguageId = "python" | "cpp" | "java";
+export type LanguageId =
+  | "python"
+  | "c"
+  | "cpp"
+  | "java"
+  | "javascript"
+  | "typescript"
+  | "go"
+  | "rust"
+  | "ruby"
+  | "php";
 
 export interface User {
   id: number;
