@@ -123,7 +123,12 @@ class DockerBackend(SandboxBackend):
         # as `nobody` (see _materialise). Nesting it is what keeps "world" from
         # meaning every user on the host: they cannot get past the outer
         # directory, while the Docker daemon mounts the inner path directly.
-        with tempfile.TemporaryDirectory(prefix="judge-", dir=staging) as private:
+        # ignore_cleanup_errors: a backend never raises (see base.py). If a
+        # container ever leaves behind a file the host cannot remove, that is
+        # a leaked temp file, not a lost submission.
+        with tempfile.TemporaryDirectory(
+            prefix="judge-", dir=staging, ignore_cleanup_errors=True
+        ) as private:
             workdir = os.path.join(private, "box")
             os.mkdir(workdir)
             try:
@@ -272,7 +277,16 @@ class DockerBackend(SandboxBackend):
                 stdin_open=False,
                 tty=False,
                 detach=True,
-                environment={"HOME": "/tmp", "PYTHONDONTWRITEBYTECODE": "1"},
+                # PYTHONPYCACHEPREFIX matters even with DONTWRITEBYTECODE: the compile
+                # stage runs `py_compile`, which writes bytecode regardless. Left alone
+                # it creates __pycache__/ in the bind mount, owned by `nobody`, and the
+                # host then cannot delete it - cleanup raised PermissionError after
+                # every Python submission. /tmp is the container's own tmpfs.
+                environment={
+                    "HOME": "/tmp",
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                    "PYTHONPYCACHEPREFIX": "/tmp/pycache",
+                },
             )
 
             started = time.perf_counter()
