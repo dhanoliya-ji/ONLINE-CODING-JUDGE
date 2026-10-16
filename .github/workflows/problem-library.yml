@@ -1,0 +1,207 @@
+name: Problem library
+
+# Builds the practice library from the TACO dataset (see scripts/library/):
+# filter and enrich -> verify every problem in Crucible's own sandbox ->
+# publish the result as a release asset -> optionally load it into the
+# database named by the DATABASE_URL secret.
+#
+# Run it from the Actions tab ("Run workflow"). Loading is idempotent, so
+# running it again updates problems in place.
+#
+# A pull request that changes the importer runs a 40-problem trial of the
+# build and verification steps; it never publishes or loads anything.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/library/**"
+      - "app/execution/**"
+      - ".github/workflows/problem-library.yml"
+  workflow_dispatch:
+    inputs:
+      load:
+        description: "Load the verified problems into the database (needs the DATABASE_URL secret)"
+        type: boolean
+        default: false
+      limit:
+        description: "Only build this many candidates (0 = all; for a quick trial)"
+        type: number
+        default: 0
+
+permissions:
+  contents: read
+
+concurrency:
+  group: problem-library
+  cancel-in-progress: false
+
+env:
+  # Pinned: TACO's test data changed in place once already.
+  TACO_COMMIT: d593ed0a2becbbc952230bb89be09189bf1056dc
+
+jobs:
+  build:
+    name: Filter and enrich
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyarrow==26.0.0
+
+      - name: Cache the TACO dataset
+        id: taco
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: taco
+          key: taco-${{ env.TACO_COMMIT }}
+
+      - name: Download the TACO dataset (2.4 GB, Apache-2.0)
+        if: steps.taco.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p taco
+          base="https://huggingface.co/datasets/BAAI/TACO/resolve/${TACO_COMMIT}/ALL"
+          files="test-00000-of-00001.parquet"
+          for k in 0 1 2 3 4 5 6 7 8; do files="$files train-0000${k}-of-00009.parquet"; done
+          for f in $files; do
+            curl -fsSL --retry 5 -o "taco/$f" "$base/$f" &
+          done
+          wait
+          ls -la taco
+
+      - name: Cache platform metadata
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .library-cache
+          key: library-metadata-${{ github.run_id }}
+          restore-keys: library-metadata-
+
+      - name: Build candidates
+        env:
+          LIMIT: ${{ github.event_name == 'pull_request' && '40' || inputs.limit }}
+        run: python -m scripts.library.build --taco taco --out out --shards 8 --limit "${LIMIT:-0}"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: candidates
+          path: out/
+
+  verify:
+    name: Verify shard ${{ matrix.shard }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: candidates
+          path: out
+      - name: Verify
+        run: python -m scripts.library.verify --in out/candidates-${{ matrix.shard }}.jsonl.gz --out verified-${{ matrix.shard }}.jsonl.gz
+      - name: Summary
+        run: |
+          echo "### Shard ${{ matrix.shard }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat verified-${{ matrix.shard }}.report.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: verified-${{ matrix.shard }}
+          path: verified-${{ matrix.shard }}.*
+
+  publish:
+    name: Publish the library
+    needs: verify
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: verified-*
+          merge-multiple: true
+          path: verified
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: candidates
+          path: out
+      - name: Combine and summarise
+        run: |
+          zcat verified/verified-*.jsonl.gz | gzip -9 > library.jsonl.gz
+          python3 - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import collections, glob, gzip, json
+          build = json.load(open("out/build-report.json"))
+          reasons = collections.Counter()
+          for path in glob.glob("verified/*.report.json"):
+              reasons.update(json.load(open(path))["reasons"])
+          problems = [json.loads(line) for line in gzip.open("library.jsonl.gz", "rt")]
+          print(f"## Problem library: {len(problems)} verified problems\n")
+          print(f"From {build['candidates']} candidates {build['by_source']}.\n")
+          print("| By source | count |\n|---|---|")
+          for name, count in collections.Counter(p["source"] for p in problems).most_common():
+              print(f"| {name} | {count} |")
+          print("\n| By difficulty | count |\n|---|---|")
+          for name, count in collections.Counter(p["difficulty"] for p in problems).most_common():
+              print(f"| {name} | {count} |")
+          print("\n| Verification | problems |\n|---|---|")
+          for reason, count in reasons.most_common():
+              print(f"| {reason} | {count} |")
+          EOF
+      - name: Attach to the problem-library release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view problem-library >/dev/null 2>&1 || gh release create problem-library \
+            --title "Problem library" --prerelease \
+            --notes "Verified practice problems built from the TACO dataset (BAAI, Apache-2.0) by the Problem library workflow. Each problem links back to its original on Codeforces, CodeChef or AtCoder."
+          gh release upload problem-library library.jsonl.gz --clobber
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: library
+          path: library.jsonl.gz
+
+  load:
+    name: Load into the database
+    needs: publish
+    if: github.event_name == 'workflow_dispatch' && inputs.load
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: library
+      - name: Load
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SECRET_KEY: library-load-only
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Add the DATABASE_URL repository secret first (Settings -> Secrets and variables -> Actions)."
+            exit 1
+          fi
+          python -m scripts.library.load library.jsonl.gz

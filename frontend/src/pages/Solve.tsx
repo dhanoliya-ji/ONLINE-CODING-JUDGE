@@ -184,7 +184,39 @@ export function Solve() {
             {problem.time_limit_ms} ms · {problem.memory_limit_mb} MB ·{" "}
             {problem.total_test_case_count} tests (
             {problem.sample_test_case_count} shown)
+            {problem.rating != null && <> · rating {problem.rating}</>}
           </p>
+          {problem.tags.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {problem.tags.map((tag) => (
+                <Link
+                  key={tag.slug}
+                  to={`/problems?tags=${tag.slug}`}
+                  className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs text-violet-200/70 hover:border-violet-300/40 hover:text-violet-100"
+                >
+                  {tag.name}
+                </Link>
+              ))}
+            </div>
+          )}
+          {problem.source && (
+            <p className="mt-2 text-xs text-violet-200/45">
+              Source:{" "}
+              {problem.source_url ? (
+                <a
+                  href={problem.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-violet-300/80 underline-offset-2 hover:underline"
+                >
+                  {problem.source}
+                </a>
+              ) : (
+                problem.source
+              )}
+              {problem.license && <> · {problem.license}</>}
+            </p>
+          )}
         </div>
       </div>
 

@@ -58,3 +58,10 @@ Thumbs.db
 coverage/
 .coverage
 coverage.xml
+
+# Problem library build (scripts/library)
+.library-cache/
+/out/
+/taco/
+verified-*.jsonl.gz
+library.jsonl.gz

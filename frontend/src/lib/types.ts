@@ -45,6 +45,10 @@ export interface ProblemSummary {
   attempted_by_me: boolean | null;
   total_submissions: number | null;
   accepted_submissions: number | null;
+  acceptance_rate: number | null;
+  tags: { slug: string; name: string }[];
+  source: string | null;
+  rating: number | null;
 }
 
 export interface Problem extends ProblemSummary {
@@ -57,6 +61,9 @@ export interface Problem extends ProblemSummary {
   is_public: boolean;
   sample_test_case_count: number;
   total_test_case_count: number;
+  source_url: string | null;
+  license: string | null;
+  checker: string;
 }
 
 export interface TestCasePublic {

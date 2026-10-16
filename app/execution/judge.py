@@ -21,7 +21,9 @@ from typing import Iterable, Sequence
 
 from app.config import settings
 from app.execution.base import ExecutionRequest, ExecutionResult, Outcome
+from app.execution.checkers import outputs_match
 from app.execution.engine import get_backend
+from app.execution.languages import get_language
 from app.models.enums import Verdict
 from app.models.test_case import TestCase
 
@@ -100,11 +102,14 @@ def judge_submission(
     test_cases: Sequence[TestCase],
     time_limit_ms: int | None = None,
     memory_limit_mb: int | None = None,
+    checker: str = "exact",
 ) -> JudgeReport:
     """Evaluate ``source_code`` against ``test_cases`` and produce a verdict."""
 
     backend = get_backend()
-    time_limit_ms = time_limit_ms or settings.EXECUTION_TIME_LIMIT_MS
+    time_limit_ms = effective_time_limit(
+        language, time_limit_ms or settings.EXECUTION_TIME_LIMIT_MS
+    )
     memory_limit_mb = memory_limit_mb or settings.EXECUTION_MEMORY_LIMIT_MB
 
     ordered = order_test_cases(test_cases)
@@ -162,10 +167,7 @@ def judge_submission(
                 test_results=reports,
             )
 
-        expected = normalise_output(test_case.expected_output)
-        actual = normalise_output(result.stdout)
-
-        if expected != actual:
+        if not outputs_match(test_case.expected_output, result.stdout, checker):
             reports.append(
                 _build_report(
                     index, test_case, False, Verdict.WRONG_ANSWER.value, result
@@ -215,11 +217,30 @@ def run_once(
             language=language,
             source_code=source_code,
             stdin=stdin,
-            time_limit_ms=time_limit_ms or settings.EXECUTION_TIME_LIMIT_MS,
+            time_limit_ms=effective_time_limit(
+                language, time_limit_ms or settings.EXECUTION_TIME_LIMIT_MS
+            ),
             memory_limit_mb=memory_limit_mb or settings.EXECUTION_MEMORY_LIMIT_MB,
             max_output_bytes=settings.EXECUTION_MAX_OUTPUT_BYTES,
         )
     )
+
+
+#: Never let a multiplied limit exceed this, whatever the problem says.
+MAX_TIME_LIMIT_MS = 20_000
+
+
+def effective_time_limit(language: str, time_limit_ms: int) -> int:
+    """The problem's limit scaled for the language, as CodeChef and AtCoder do.
+
+    A problem's limit is set for C++. Interpreted languages get a multiple of
+    it, so a correct Python solution is not rejected for being Python.
+    """
+    try:
+        multiplier = get_language(language).time_multiplier
+    except ValueError:
+        multiplier = 1.0
+    return min(int(time_limit_ms * multiplier), MAX_TIME_LIMIT_MS)
 
 
 # ---------------------------------------------------------------------- #

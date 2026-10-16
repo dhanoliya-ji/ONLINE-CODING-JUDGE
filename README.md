@@ -173,6 +173,9 @@ locally and still deploy to a free host that forbids it.
 - Filter by tags, difficulty, source, your progress
 - Sort by acceptance, popularity, difficulty, newest
 - Daily problem and random pick
+- Thousands of verified practice problems imported from
+  Codeforces, CodeChef and AtCoder via the TACO dataset,
+  each linked to its original
 - Source and licence shown for imported problems
 - Per-problem time and memory limits
 - Draft/published visibility
@@ -190,6 +193,8 @@ locally and still deploy to a free host that forbids it.
 - 10 languages: Python, C, C++, Java, JavaScript,
   TypeScript, Go, Rust, Ruby, PHP
 - Seven verdicts incl. Compilation Error and MLE
+- Checkers: exact, tokens, case-insensitive, float ε
+- Per-language time multipliers (Python 3×, Java 2×)
 - Real execution time and peak memory
 - Per-test breakdown; diffs for samples only
 - `POST /submissions/run` for scratch runs
@@ -315,6 +320,7 @@ This README is the overview. The detail lives in `docs/`:
 | **[API reference](docs/API.md)** | Every endpoint, parameters, request/response bodies, status codes, error shapes, and worked `curl` examples |
 | **[Security](docs/SECURITY.md)** | The sandbox in full, the threat model, what the fallback backend does *not* protect, auth, RBAC, and known limitations |
 | **[Deployment](docs/DEPLOYMENT.md)** | Neon setup, Render blueprint, environment variables, self-hosting with the real Docker sandbox, troubleshooting |
+| **[Problem library](docs/PROBLEM_LIBRARY.md)** | Where the imported problems come from, what is filtered out and why, how each one is verified, and how to run the import |
 | **[Development](docs/DEVELOPMENT.md)** | Local setup in three modes, project layout, testing, seeding, screenshot regeneration, contributing |
 | **[Frontend](frontend/README.md)** | Design system, component structure, state, routing, build and the glassmorphism decisions |
 | **[Screenshots](docs/screenshots/README.md)** | How the images are generated and how to regenerate them |

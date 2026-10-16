@@ -160,8 +160,9 @@ The current account.
 | `difficulty` | `Easy` \| `Medium` \| `Hard` | Repeat for several: `?difficulty=Easy&difficulty=Medium` |
 | `tags` | string | Comma-separated tag slugs; a problem must carry **all** of them |
 | `source` | string | e.g. `Codeforces` (see `/problems/facets`) |
+| `min_rating` / `max_rating` | int | Codeforces-scale rating (800–3500), where known |
 | `status` | `solved` \| `attempted` \| `todo` | Your progress (`attempted` = tried, not solved; `todo` = never tried). Needs a token; ignored otherwise |
-| `sort` | `id` \| `title` \| `difficulty` \| `acceptance` \| `popular` \| `newest` \| `relevance` | Default `relevance` when searching (Postgres), else `id`. Unattempted problems sort last by `acceptance`/`popular` |
+| `sort` | `id` \| `title` \| `difficulty` \| `rating` \| `acceptance` \| `popular` \| `newest` \| `relevance` | Default `relevance` when searching (Postgres), else `id`. Unattempted problems sort last by `acceptance`/`popular` |
 | `order` | `asc` \| `desc` | Default `asc` (`newest` is newest-first by default) |
 | `limit` / `offset` | int | Pagination |
 
@@ -227,9 +228,16 @@ existence is not leaked.
   "sample_input": "2 3", "sample_output": "5",
   "time_limit_ms": 2000, "memory_limit_mb": 128, "is_public": true,
   "tags": ["Math", "Implementation"],
-  "source": "Codeforces", "source_url": "https://codeforces.com/...", "license": "CC BY 4.0"
+  "source": "Codeforces", "source_url": "https://codeforces.com/...", "license": "CC BY 4.0",
+  "rating": 1400, "checker": "tokens"
 }
 ```
+
+`checker` decides how output is compared: `exact` (default; line by line,
+ignoring trailing spaces), `tokens` (whitespace-separated tokens),
+`case_insensitive`, or `float:<eps>` (numbers within absolute or relative
+error `eps`). The time limit is for C++; Python, Ruby and PHP get 3× it, and
+Java, JavaScript and TypeScript 2× (see `GET /submissions/languages`).
 
 The slug is derived from the title, with a `-2`, `-3`… suffix on collision.
 `409` if the title exists. Tags are given by name and created on first use;

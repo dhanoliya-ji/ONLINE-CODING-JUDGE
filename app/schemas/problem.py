@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
+
+from app.execution.checkers import is_valid_checker
 
 from app.models.enums import Difficulty
 from app.schemas.common import ORMModel
@@ -25,6 +27,16 @@ class ProblemBase(BaseModel):
     source: str | None = Field(default=None, max_length=80)
     source_url: str | None = Field(default=None, max_length=500)
     license: str | None = Field(default=None, max_length=120)
+    rating: int | None = Field(default=None, ge=0, le=5000)
+    checker: str = Field(default="exact", max_length=40,
+                         description="exact | tokens | case_insensitive | float:<eps>")
+
+    @field_validator("checker")
+    @classmethod
+    def _known_checker(cls, value: str) -> str:
+        if not is_valid_checker(value):
+            raise ValueError("checker must be exact, tokens, case_insensitive or float:<eps>")
+        return value
 
 
 class ProblemCreate(ProblemBase):
@@ -49,6 +61,15 @@ class ProblemUpdate(BaseModel):
     source: str | None = Field(default=None, max_length=80)
     source_url: str | None = Field(default=None, max_length=500)
     license: str | None = Field(default=None, max_length=120)
+    rating: int | None = Field(default=None, ge=0, le=5000)
+    checker: str | None = Field(default=None, max_length=40)
+
+    @field_validator("checker")
+    @classmethod
+    def _known_checker(cls, value: str | None) -> str | None:
+        if value is not None and not is_valid_checker(value):
+            raise ValueError("checker must be exact, tokens, case_insensitive or float:<eps>")
+        return value
 
 
 class TagOut(ORMModel):
@@ -80,6 +101,7 @@ class ProblemSummary(ORMModel):
     created_at: datetime
     tags: list[TagOut] = []
     source: str | None = None
+    rating: int | None = None
 
     # Populated per-request for authenticated callers.
     solved_by_me: bool | None = None
@@ -106,5 +128,6 @@ class ProblemResponse(ProblemSummary):
     is_public: bool
     source_url: str | None = None
     license: str | None = None
+    checker: str = "exact"
     sample_test_case_count: int = 0
     total_test_case_count: int = 0
