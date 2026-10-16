@@ -33,7 +33,7 @@ export function Problems() {
       api
         .problems({
           search: search || undefined,
-          difficulty: difficulty === "All" ? undefined : difficulty,
+          difficulty: difficulty === "All" ? undefined : [difficulty],
           limit: PAGE_SIZE,
           offset,
         })

@@ -22,6 +22,19 @@ class LanguageUsage(BaseModel):
     accepted: int
 
 
+class DayActivity(BaseModel):
+    date: str = Field(description="UTC day, YYYY-MM-DD")
+    submissions: int
+    accepted: int
+
+
+class TagProgress(BaseModel):
+    slug: str
+    name: str
+    solved: int
+    total: int
+
+
 class DashboardResponse(BaseModel):
     username: str
     email: str
@@ -39,3 +52,9 @@ class DashboardResponse(BaseModel):
     difficulty_progress: list[DifficultyProgress] = []
     language_usage: list[LanguageUsage] = []
     recent_submissions: list[SubmissionSummary] = []
+
+    #: Days with at least one submission over the last year, oldest first.
+    activity: list[DayActivity] = []
+    current_streak: int = Field(0, description="Consecutive days up to today (or yesterday) with a submission")
+    longest_streak: int = 0
+    tag_progress: list[TagProgress] = []

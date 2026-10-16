@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Suspense, lazy, type ReactNode } from "react";
 import { AuthProvider, useAuth } from "./lib/auth";
+import { ThemeProvider } from "./lib/theme";
 import { Layout } from "./components/Layout";
 import { Spinner } from "./components/ui";
 import { Landing } from "./pages/Landing";
@@ -11,6 +12,7 @@ import { ContestDetail } from "./pages/ContestDetail";
 import { Submissions } from "./pages/Submissions";
 import { Dashboard } from "./pages/Dashboard";
 import { NotFound } from "./pages/NotFound";
+import { Leaderboard } from "./pages/Leaderboard";
 
 // The code editor is ~210 kB gzipped — two thirds of the whole bundle — and is
 // only needed once someone opens a problem. Splitting it here keeps the
@@ -21,7 +23,7 @@ const Solve = lazy(() =>
 
 function RouteFallback() {
   return (
-    <div className="grid min-h-[60dvh] place-items-center text-violet-300">
+    <div className="grid min-h-[60dvh] place-items-center text-ember">
       <Spinner size={26} />
     </div>
   );
@@ -34,7 +36,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="grid min-h-[60dvh] place-items-center text-violet-300">
+      <div className="grid min-h-[60dvh] place-items-center text-ember">
         <Spinner size={26} />
       </div>
     );
@@ -49,6 +51,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
 
 export default function App() {
   return (
+    <ThemeProvider>
     <BrowserRouter>
       <AuthProvider>
         <Routes>
@@ -68,6 +71,7 @@ export default function App() {
             />
 
             <Route path="contests" element={<Contests />} />
+            <Route path="leaderboard" element={<Leaderboard />} />
             <Route path="contests/:id" element={<ContestDetail />} />
 
             <Route
@@ -92,5 +96,6 @@ export default function App() {
         </Routes>
       </AuthProvider>
     </BrowserRouter>
+    </ThemeProvider>
   );
 }

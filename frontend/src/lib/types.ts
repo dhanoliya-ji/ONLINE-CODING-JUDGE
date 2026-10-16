@@ -210,6 +210,52 @@ export interface Dashboard {
     accepted: number;
   }[];
   recent_submissions: Submission[];
+  activity: { date: string; submissions: number; accepted: number }[];
+  current_streak: number;
+  longest_streak: number;
+  tag_progress: { slug: string; name: string; solved: number; total: number }[];
+}
+
+export interface Facets {
+  tags: { slug: string; name: string; problem_count: number }[];
+  sources: Record<string, number>;
+  difficulties: Record<string, number>;
+}
+
+export type ProblemSort =
+  | "id"
+  | "title"
+  | "difficulty"
+  | "rating"
+  | "acceptance"
+  | "popular"
+  | "newest"
+  | "relevance";
+
+export interface ProblemQuery {
+  search?: string;
+  difficulty?: Difficulty[];
+  /** Comma-separated tag slugs; a problem must have all of them. */
+  tags?: string;
+  source?: string;
+  status?: "solved" | "attempted" | "todo";
+  sort?: ProblemSort;
+  order?: "asc" | "desc";
+  min_rating?: number;
+  max_rating?: number;
+  limit?: number;
+  offset?: number;
+}
+
+export interface LeaderboardRow {
+  rank: number;
+  username: string;
+  solved: number;
+  easy: number;
+  medium: number;
+  hard: number;
+  submissions: number;
+  acceptance_rate: number;
 }
 
 export interface Health {

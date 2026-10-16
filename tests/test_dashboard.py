@@ -66,3 +66,17 @@ def test_statistics_are_scoped_to_the_caller(
     _submit(client, user_headers, problem_id, SOLUTION_ACCEPTED)
     body = client.get(f"{API}/dashboard", headers=admin_headers).json()
     assert body["total_submissions"] == 0
+
+
+def test_activity_streaks_and_topics(client, admin_headers, user_headers, problem_id):
+    from tests.conftest import SOLUTION_ACCEPTED
+
+    client.patch(f"{API}/problems/{problem_id}", headers=admin_headers, json={"tags": ["Math"]})
+    client.post(f"{API}/submissions", headers=user_headers,
+                json={"problem_id": problem_id, "language": "python", "source_code": SOLUTION_ACCEPTED})
+
+    data = client.get(f"{API}/dashboard", headers=user_headers).json()
+    assert len(data["activity"]) == 1
+    assert data["activity"][0]["submissions"] == 1 and data["activity"][0]["accepted"] == 1
+    assert data["current_streak"] == 1 and data["longest_streak"] == 1
+    assert data["tag_progress"] == [{"slug": "math", "name": "Math", "solved": 1, "total": 1}]

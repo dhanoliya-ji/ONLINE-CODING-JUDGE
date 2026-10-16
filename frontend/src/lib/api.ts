@@ -8,7 +8,10 @@ import type {
   Health,
   Leaderboard,
   Page,
+  Facets,
+  LeaderboardRow,
   Problem,
+  ProblemQuery,
   ProblemSummary,
   RunResult,
   Submission,
@@ -137,10 +140,13 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return payload as T;
 }
 
-const qs = (params: Record<string, unknown>) => {
+const qs = (params: object) => {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null && value !== "") {
+    if (Array.isArray(value)) {
+      // Repeated keys: ?difficulty=Easy&difficulty=Medium
+      for (const entry of value) search.append(key, String(entry));
+    } else if (value !== undefined && value !== null && value !== "") {
       search.set(key, String(value));
     }
   }
@@ -161,12 +167,13 @@ export const api = {
   me: () => request<User>("/auth/me"),
 
   // ---- problems --------------------------------------------------------
-  problems: (params: {
-    search?: string;
-    difficulty?: string;
-    limit?: number;
-    offset?: number;
-  }) => request<Page<ProblemSummary>>(`/problems${qs(params)}`),
+  problems: (params: ProblemQuery) => request<Page<ProblemSummary>>(`/problems${qs(params)}`),
+  facets: () => request<Facets>("/problems/facets"),
+  dailyProblem: () => request<ProblemSummary>("/problems/daily"),
+  randomProblem: (params: { difficulty?: string[]; tags?: string; unsolved?: boolean }) =>
+    request<ProblemSummary>(`/problems/random${qs(params)}`),
+  globalLeaderboard: (params: { limit?: number; offset?: number } = {}) =>
+    request<Page<LeaderboardRow>>(`/leaderboard${qs(params)}`),
   problem: (identifier: string | number) => request<Problem>(`/problems/${identifier}`),
   coachStatus: (identifier: string | number) =>
     request<CoachStatus>(`/problems/${identifier}/coach`),

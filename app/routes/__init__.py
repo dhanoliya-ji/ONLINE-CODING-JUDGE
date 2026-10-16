@@ -10,6 +10,7 @@ from app.routes import (
     contests,
     dashboard,
     health,
+    leaderboard,
     problems,
     submissions,
     test_cases,
@@ -31,5 +32,6 @@ api_router.include_router(submissions.router)
 api_router.include_router(contests.router)
 api_router.include_router(contest_problems.router)
 api_router.include_router(dashboard.router)
+api_router.include_router(leaderboard.router)
 
 __all__ = ["api_router"]

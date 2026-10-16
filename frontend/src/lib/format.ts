@@ -27,17 +27,24 @@ export function verdictTone(verdict: string): {
 }
 
 export const TONE_CLASSES: Record<string, string> = {
-  pass: "text-emerald-300 bg-emerald-400/12 border-emerald-400/30",
-  fail: "text-rose-300 bg-rose-400/12 border-rose-400/30",
-  warn: "text-amber-300 bg-amber-400/12 border-amber-400/30",
-  info: "text-sky-300 bg-sky-400/12 border-sky-400/30",
-  muted: "text-violet-200/70 bg-white/6 border-white/12",
+  pass: "text-pass bg-pass/12 border-pass/30",
+  fail: "text-fail bg-fail/12 border-fail/30",
+  warn: "text-warn bg-warn/12 border-warn/30",
+  info: "text-info bg-info/12 border-info/30",
+  muted: "text-ink-2 bg-surface-2 border-line",
 };
 
 export const DIFFICULTY_CLASSES: Record<Difficulty, string> = {
-  Easy: "text-emerald-300 bg-emerald-400/12 border-emerald-400/25",
-  Medium: "text-amber-300 bg-amber-400/12 border-amber-400/25",
-  Hard: "text-rose-300 bg-rose-400/12 border-rose-400/25",
+  Easy: "text-pass bg-pass/10 border-pass/25",
+  Medium: "text-warn bg-warn/10 border-warn/25",
+  Hard: "text-fail bg-fail/10 border-fail/25",
+};
+
+/** Plain text colour per difficulty, for tables and inline mentions. */
+export const DIFFICULTY_TEXT: Record<Difficulty, string> = {
+  Easy: "text-pass",
+  Medium: "text-warn",
+  Hard: "text-fail",
 };
 
 export const LANGUAGE_LABELS: Record<string, string> = {
