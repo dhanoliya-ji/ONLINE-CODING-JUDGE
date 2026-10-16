@@ -156,10 +156,16 @@ The current account.
 
 | Query | Type | Notes |
 |---|---|---|
-| `search` | string | Case-insensitive title match |
-| `difficulty` | `Easy` \| `Medium` \| `Hard` | |
-| `solved` | bool | Filter by your own solve status; needs a token |
+| `search` | string | Words in the title or statement. Postgres full-text search (stemmed: "paths" finds "path"); plain substring match on SQLite |
+| `difficulty` | `Easy` \| `Medium` \| `Hard` | Repeat for several: `?difficulty=Easy&difficulty=Medium` |
+| `tags` | string | Comma-separated tag slugs; a problem must carry **all** of them |
+| `source` | string | e.g. `Codeforces` (see `/problems/facets`) |
+| `status` | `solved` \| `attempted` \| `todo` | Your progress (`attempted` = tried, not solved; `todo` = never tried). Needs a token; ignored otherwise |
+| `sort` | `id` \| `title` \| `difficulty` \| `acceptance` \| `popular` \| `newest` \| `relevance` | Default `relevance` when searching (Postgres), else `id`. Unattempted problems sort last by `acceptance`/`popular` |
+| `order` | `asc` \| `desc` | Default `asc` (`newest` is newest-first by default) |
 | `limit` / `offset` | int | Pagination |
+
+`solved=true|false` still works (deprecated; it maps to `status=solved|todo`).
 
 ```json
 {
@@ -167,8 +173,9 @@ The current account.
     "id": 1, "slug": "sum-of-two-numbers", "title": "Sum of Two Numbers",
     "difficulty": "Easy", "time_limit_ms": 2000, "memory_limit_mb": 128,
     "created_at": "2026-08-11T10:22:00Z",
+    "tags": [{"slug": "math", "name": "Math"}], "source": null,
     "solved_by_me": true, "attempted_by_me": true,
-    "total_submissions": 18, "accepted_submissions": 8
+    "total_submissions": 18, "accepted_submissions": 8, "acceptance_rate": 44.4
   }],
   "total": 6, "limit": 20, "offset": 0
 }
@@ -178,10 +185,34 @@ The current account.
 aggregate counts are computed in two grouped queries for the whole page, not one
 query per row.
 
+### `GET /problems/facets` 🌐
+
+Everything the list can be filtered by, with counts of public problems:
+
+```json
+{
+  "tags": [{"slug": "dynamic-programming", "name": "Dynamic Programming", "problem_count": 412}],
+  "sources": {"Codeforces": 1890, "AtCoder": 960},
+  "difficulties": {"Easy": 1620, "Medium": 2110, "Hard": 1270}
+}
+```
+
+### `GET /problems/daily` 🌐
+
+Today's problem (UTC): the same for everyone all day, a different one
+tomorrow. Never a problem in a live or upcoming contest.
+
+### `GET /problems/random` 🌐
+
+A random practice problem. Accepts `difficulty` (repeatable) and `tags`, and
+skips problems you have solved unless `unsolved=false`. `404` when nothing
+matches. Never returns a problem in a live or upcoming contest.
+
 ### `GET /problems/{id|slug}` 🌐
 
 Accepts a numeric id or a slug. Adds the statement plus
-`sample_test_case_count` and `total_test_case_count`.
+`sample_test_case_count` and `total_test_case_count`, and the provenance
+fields `source_url` and `license` for imported problems.
 
 Unpublished problems return **`404` to non-admins** — not `403`, so their
 existence is not leaked.
@@ -194,17 +225,20 @@ existence is not leaked.
   "difficulty": "Easy",
   "input_format": "...", "output_format": "...", "constraints": "...",
   "sample_input": "2 3", "sample_output": "5",
-  "time_limit_ms": 2000, "memory_limit_mb": 128, "is_public": true
+  "time_limit_ms": 2000, "memory_limit_mb": 128, "is_public": true,
+  "tags": ["Math", "Implementation"],
+  "source": "Codeforces", "source_url": "https://codeforces.com/...", "license": "CC BY 4.0"
 }
 ```
 
 The slug is derived from the title, with a `-2`, `-3`… suffix on collision.
-`409` if the title exists.
+`409` if the title exists. Tags are given by name and created on first use;
+names differing only in case or spacing are the same tag.
 
 ### `PATCH /problems/{id}` 👑
 
 A genuine PATCH — every field optional, only supplied fields change. Changing
-the title regenerates the slug.
+the title regenerates the slug; `tags` replaces the whole tag list.
 
 ### `DELETE /problems/{id}` 👑
 

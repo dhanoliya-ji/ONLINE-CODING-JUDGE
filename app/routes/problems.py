@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
@@ -12,6 +14,7 @@ from app.models.submission import Submission
 from app.models.test_case import TestCase
 from app.models.user import User
 from app.schemas.common import Message, Page
+from app.services import catalogue
 from app.schemas.problem import (
     ProblemCreate,
     ProblemResponse,
@@ -23,68 +26,110 @@ from app.utils.slug import unique_slug
 router = APIRouter(prefix="/problems", tags=["Problems"])
 
 
+SortKey = Literal["id", "title", "difficulty", "acceptance", "popular", "newest", "relevance"]
+StatusFilter = Literal["solved", "attempted", "todo"]
+
+
 @router.get(
     "",
     response_model=Page[ProblemSummary],
-    summary="List problems with filters and pagination",
+    summary="List problems with search, filters, sorting and pagination",
 )
 def list_problems(
     db: Session = Depends(get_db),
     viewer: User | None = Depends(get_optional_user),
-    search: str | None = Query(default=None, description="Match against the title"),
-    difficulty: Difficulty | None = None,
-    solved: bool | None = Query(
-        default=None,
-        description="Filter by your own solve status (requires authentication)",
+    search: str | None = Query(
+        default=None, max_length=200, description="Words to find in the title or statement"
     ),
+    difficulty: list[Difficulty] | None = Query(
+        default=None, description="Repeat to allow several: ?difficulty=Easy&difficulty=Medium"
+    ),
+    tags: str | None = Query(
+        default=None, description="Comma-separated tag slugs; a problem must have all of them"
+    ),
+    source: str | None = Query(default=None, max_length=80),
+    status_filter: StatusFilter | None = Query(
+        default=None,
+        alias="status",
+        description="Your progress: solved, attempted (tried, not solved) or todo (never tried). "
+        "Ignored for anonymous callers.",
+    ),
+    solved: bool | None = Query(
+        default=None, deprecated=True, description="Use status=solved / status=todo instead"
+    ),
+    sort: SortKey | None = Query(
+        default=None, description="Default: relevance when searching, otherwise id"
+    ),
+    order: Literal["asc", "desc"] = "asc",
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> Page[ProblemSummary]:
     is_admin = bool(viewer and viewer.is_admin)
+    dialect = db.get_bind().dialect.name
 
     conditions = []
     if not is_admin:
         # Unpublished problems are invisible to everyone but admins.
         conditions.append(Problem.is_public.is_(True))
-    if difficulty is not None:
-        conditions.append(Problem.difficulty == difficulty.value)
-    if search:
-        conditions.append(Problem.title.ilike(f"%{search.strip()}%"))
+    if difficulty:
+        conditions.append(Problem.difficulty.in_([level.value for level in difficulty]))
+    if tags:
+        conditions.extend(catalogue.has_all_tags([t.strip() for t in tags.split(",") if t.strip()]))
+    if source:
+        conditions.append(Problem.source == source)
+    if search and search.strip():
+        conditions.append(catalogue.search_condition(search, dialect))
+
+    if status_filter is None and solved is not None:
+        status_filter = "solved" if solved else "todo"
+    if viewer is not None and status_filter is not None:
+        solved_ids = catalogue.solved_by(viewer.id)
+        if status_filter == "solved":
+            conditions.append(Problem.id.in_(solved_ids))
+        elif status_filter == "attempted":
+            conditions.append(Problem.id.in_(catalogue.attempted_by(viewer.id)))
+            conditions.append(Problem.id.not_in(solved_ids))
+        else:
+            conditions.append(Problem.id.not_in(catalogue.attempted_by(viewer.id)))
 
     total = db.scalar(select(func.count(Problem.id)).where(*conditions)) or 0
 
-    rows = list(
-        db.scalars(
-            select(Problem)
-            .where(*conditions)
-            .order_by(Problem.id)
-            .limit(limit)
-            .offset(offset)
-        )
+    query = select(Problem).where(*conditions)
+    searching = bool(search and search.strip())
+    if sort is None:
+        sort = "relevance" if searching else "id"
+    if sort == "relevance" and not (searching and dialect == "postgresql"):
+        sort = "id"  # Relevance needs a search, and Postgres to rank it.
+
+    descending = order == "desc"
+    if sort in ("acceptance", "popular"):
+        stats = catalogue.submission_stats_subquery()
+        query = query.outerjoin(stats, stats.c.problem_id == Problem.id)
+        total_col = func.coalesce(stats.c.total, 0)
+        if sort == "popular":
+            key = total_col
+        else:
+            key = func.coalesce(stats.c.accepted, 0) * 1.0 / func.nullif(total_col, 0)
+        # Problems nobody has tried yet sort last either way.
+        query = query.order_by(case((total_col > 0, 0), else_=1),
+                               key.desc() if descending else key.asc(), Problem.id)
+    elif sort == "relevance":
+        query = query.order_by(catalogue.search_rank(search or "").desc(), Problem.id)
+    else:
+        key = {
+            "id": Problem.id,
+            "title": Problem.title,
+            "difficulty": catalogue.DIFFICULTY_RANK,
+            "newest": Problem.created_at,
+        }[sort]
+        if sort == "newest":
+            descending = not descending
+        query = query.order_by(key.desc() if descending else key.asc(), Problem.id)
+
+    rows = list(db.scalars(query.limit(limit).offset(offset)))
+    return Page[ProblemSummary](
+        items=_summaries(db, viewer, rows), total=total, limit=limit, offset=offset
     )
-
-    # Per-problem aggregates for the visible page only - two queries total,
-    # rather than one per row.
-    problem_ids = [p.id for p in rows]
-    stats = _submission_stats(db, problem_ids)
-    mine = _viewer_progress(db, viewer, problem_ids)
-
-    items: list[ProblemSummary] = []
-    for problem in rows:
-        summary = ProblemSummary.model_validate(problem)
-        total_subs, accepted_subs = stats.get(problem.id, (0, 0))
-        summary.total_submissions = total_subs
-        summary.accepted_submissions = accepted_subs
-        if viewer is not None:
-            attempted, solved_flag = mine.get(problem.id, (False, False))
-            summary.attempted_by_me = attempted
-            summary.solved_by_me = solved_flag
-        items.append(summary)
-
-    if solved is not None and viewer is not None:
-        items = [item for item in items if bool(item.solved_by_me) is solved]
-
-    return Page[ProblemSummary](items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get(
@@ -149,11 +194,12 @@ def create_problem(
         )
 
     problem = Problem(
-        **payload.model_dump(exclude={"difficulty"}),
+        **payload.model_dump(exclude={"difficulty", "tags"}),
         difficulty=payload.difficulty.value,
         slug=unique_slug(payload.title, lambda s: _slug_taken(db, s)),
         created_by=admin.id,
     )
+    problem.tags = catalogue.resolve_tags(db, payload.tags)
 
     db.add(problem)
     db.commit()
@@ -178,6 +224,10 @@ def update_problem(
         raise _not_found()
 
     changes = payload.model_dump(exclude_unset=True)
+
+    tag_names = changes.pop("tags", None)
+    if tag_names is not None:
+        problem.tags = catalogue.resolve_tags(db, tag_names)
 
     if "difficulty" in changes and changes["difficulty"] is not None:
         changes["difficulty"] = changes["difficulty"].value
@@ -243,6 +293,25 @@ def _not_found() -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_404_NOT_FOUND, detail="Problem not found"
     )
+
+
+def _summaries(db: Session, viewer: User | None, rows: list[Problem]) -> list[ProblemSummary]:
+    """Rows plus their submission stats and the viewer's progress.
+
+    Two aggregate queries for the whole page, rather than two per row.
+    """
+    problem_ids = [p.id for p in rows]
+    stats = _submission_stats(db, problem_ids)
+    mine = _viewer_progress(db, viewer, problem_ids)
+
+    items: list[ProblemSummary] = []
+    for problem in rows:
+        summary = ProblemSummary.model_validate(problem)
+        summary.total_submissions, summary.accepted_submissions = stats.get(problem.id, (0, 0))
+        if viewer is not None:
+            summary.attempted_by_me, summary.solved_by_me = mine.get(problem.id, (False, False))
+        items.append(summary)
+    return items
 
 
 def _slug_taken(db: Session, slug: str, exclude_id: int | None = None) -> bool:

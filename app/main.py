@@ -42,21 +42,22 @@ backend is active.
 """
 
 
-def _create_tables() -> None:
-    """Create any missing tables, tolerating a race with other workers.
+def _migrate() -> None:
+    """Bring the schema up to date, tolerating a race with other workers.
 
     The image runs `uvicorn --workers 2`, and every worker runs this lifespan.
-    On a fresh database both can see a table missing and both issue CREATE
-    TABLE; the loser fails with "table ... already exists" and takes its
-    worker down. That is a race, not an error: a second pass finds every
-    table and creates nothing. A genuine database problem fails the second
-    pass the same way, so it still surfaces.
+    On Postgres an advisory lock serialises them (see app/migrate.py). SQLite
+    has no such lock, so a worker that loses the race simply re-checks: the
+    second pass finds everything applied and does nothing, while a genuine
+    database problem fails it the same way and still surfaces.
     """
+    from app.migrate import upgrade_database
+
     try:
-        Base.metadata.create_all(bind=engine)
+        upgrade_database()
     except DatabaseError:
-        logger.info("Another worker was creating tables at the same time; re-checking")
-        Base.metadata.create_all(bind=engine)
+        logger.info("Another worker was migrating at the same time; re-checking")
+        upgrade_database()
 
 
 @asynccontextmanager
@@ -68,10 +69,10 @@ async def lifespan(app: FastAPI):
         "sqlite" if settings.is_sqlite else "postgresql",
     )
 
-    # Idempotent: creates only what is missing. Safe to run on every boot,
-    # which is what makes a fresh Render/Neon deployment work with no manual
-    # migration step.
-    _create_tables()
+    # Idempotent: applies only the migrations not yet applied. Safe to run on
+    # every boot, which is what makes a fresh Render/Neon deployment -- and
+    # every schema change after it -- work with no manual migration step.
+    _migrate()
 
     from app.execution.engine import get_backend
 

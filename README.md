@@ -169,7 +169,11 @@ locally and still deploy to a free host that forbids it.
 **Problems**
 - Full CRUD, admin-gated
 - Slug URLs (`/problems/sum-of-two-numbers`)
-- Search, difficulty filter, pagination
+- Topic tags; full-text search over statements
+- Filter by tags, difficulty, source, your progress
+- Sort by acceptance, popularity, difficulty, newest
+- Daily problem and random pick
+- Source and licence shown for imported problems
 - Per-problem time and memory limits
 - Draft/published visibility
 - Per-user `solved` / `attempted` markers
@@ -212,6 +216,7 @@ locally and still deploy to a free host that forbids it.
 - CodeMirror 6 editor, drafts persisted locally
 - Cold-start detection and messaging
 - `/health` reporting DB and sandbox status
+- Alembic migrations applied on start-up
 - 94 automated tests, GitHub Actions CI
 - Reproducible, script-generated screenshots
 
@@ -369,16 +374,10 @@ that documents its edges.
 1. **The free live demo does not use container isolation.** It runs the `local`
    rlimit backend, which has no network or filesystem namespace. Treat the
    hosted demo as a functional showcase, not a hardened service.
-2. **Java is unavailable on the hosted demo.** Render's native Python runtime
-   has no JDK, so Java submissions return a clear "toolchain is not installed"
-   error rather than a misleading verdict. All three languages work locally
-   under `docker compose up`.
-3. **Judging is synchronous.** A burst of submissions occupies worker threads.
+2. **Judging is synchronous. A burst of submissions occupies worker threads.
    Correct under demo load; a queue is the fix at scale.
-4. **`create_all()` is not a migration system.** New tables appear; changed
-   columns do not.
-5. **No rate limiting.** A reverse-proxy limit or `slowapi` is the straightforward addition.
-6. **The Docker backend is unverified on Windows hosts.** It is written against
+3. **No rate limiting on submissions.** A reverse-proxy limit or `slowapi` is the straightforward addition.
+4. **The Docker backend is unverified on Windows hosts.** It is written against
    Linux container semantics; Docker Desktop runs a Linux VM so it should work,
    but CI only exercises the local backend.
 
@@ -391,11 +390,10 @@ that documents its edges.
 - [ ] **Celery + Redis queue** — asynchronous judging with a status poll
 - [ ] **WebSocket live verdicts** — per-test progress as it happens
 - [ ] **Rate limiting** — per-user submission throttle
-- [ ] **Alembic migrations** — once the schema must change under real data
 - [ ] **Dedicated judge workers** — isolate execution from the credential-holding host
 - [ ] **Special judges** — checker programs for problems with multiple valid answers
 - [ ] **Rejudge** — re-run a problem's submissions after a test-suite fix
-- [ ] **Editorials and problem tags**
+- [ ] **Editorials**
 - [ ] **Plagiarism detection** — MOSS-style similarity over accepted solutions
 
 ---
