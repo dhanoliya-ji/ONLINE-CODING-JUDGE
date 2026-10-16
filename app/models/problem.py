@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, deferred, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
 from app.models.tag import Tag, problem_tags
@@ -59,6 +59,24 @@ class Problem(TimestampMixin, Base):
     source: Mapped[str | None] = mapped_column(String(80), index=True, nullable=True)
     source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     license: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    #: Identity in the source, e.g. "codeforces/330/B": what makes a re-import
+    #: update the existing problem instead of adding a duplicate.
+    external_id: Mapped[str | None] = mapped_column(
+        String(120), unique=True, index=True, nullable=True
+    )
+
+    #: Codeforces-style difficulty rating (800-3500), when known.
+    rating: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
+
+    #: How output is compared; see app/execution/checkers.py.
+    checker: Mapped[str] = mapped_column(
+        String(40), default="exact", server_default="exact", nullable=False
+    )
+
+    # A known-correct solution, kept for editorials and the coach. Never sent
+    # to students, and deferred so list queries do not load it.
+    reference_solution: Mapped[str | None] = deferred(mapped_column(Text, nullable=True))
+    reference_language: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     tags: Mapped[list[Tag]] = relationship(
         secondary=problem_tags, lazy="selectin", order_by=Tag.name

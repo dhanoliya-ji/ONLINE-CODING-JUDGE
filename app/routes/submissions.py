@@ -95,6 +95,7 @@ def create_submission(
             test_cases=test_cases,
             time_limit_ms=problem.time_limit_ms,
             memory_limit_mb=problem.memory_limit_mb,
+            checker=problem.checker,
         )
     except Exception:  # noqa: BLE001 - a judge failure must not lose the row
         logger.exception("Judging failed for submission %s", submission.id)

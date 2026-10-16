@@ -26,7 +26,9 @@ from app.utils.slug import unique_slug
 router = APIRouter(prefix="/problems", tags=["Problems"])
 
 
-SortKey = Literal["id", "title", "difficulty", "acceptance", "popular", "newest", "relevance"]
+SortKey = Literal[
+    "id", "title", "difficulty", "rating", "acceptance", "popular", "newest", "relevance"
+]
 StatusFilter = Literal["solved", "attempted", "todo"]
 
 
@@ -48,6 +50,8 @@ def list_problems(
         default=None, description="Comma-separated tag slugs; a problem must have all of them"
     ),
     source: str | None = Query(default=None, max_length=80),
+    min_rating: int | None = Query(default=None, ge=0, le=5000),
+    max_rating: int | None = Query(default=None, ge=0, le=5000),
     status_filter: StatusFilter | None = Query(
         default=None,
         alias="status",
@@ -77,6 +81,10 @@ def list_problems(
         conditions.extend(catalogue.has_all_tags([t.strip() for t in tags.split(",") if t.strip()]))
     if source:
         conditions.append(Problem.source == source)
+    if min_rating is not None:
+        conditions.append(Problem.rating >= min_rating)
+    if max_rating is not None:
+        conditions.append(Problem.rating <= max_rating)
     if search and search.strip():
         conditions.append(catalogue.search_condition(search, dialect))
 
@@ -120,6 +128,7 @@ def list_problems(
             "id": Problem.id,
             "title": Problem.title,
             "difficulty": catalogue.DIFFICULTY_RANK,
+            "rating": func.coalesce(Problem.rating, 0),
             "newest": Problem.created_at,
         }[sort]
         if sort == "newest":

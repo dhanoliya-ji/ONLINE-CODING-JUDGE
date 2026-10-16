@@ -37,6 +37,9 @@ class LanguageSpec:
     #: heap (Go): the local backend kills the run once its resident memory
     #: passes the limit.
     enforce_rss_limit: bool = False
+    #: Multiple of the problem's (C++-calibrated) time limit this language
+    #: gets. See ``judge.effective_time_limit``.
+    time_multiplier: float = 1.0
 
     @property
     def needs_compile(self) -> bool:
@@ -57,6 +60,7 @@ class LanguageSpec:
 LANGUAGES: dict[str, LanguageSpec] = {
     Language.PYTHON.value: LanguageSpec(
         id=Language.PYTHON.value,
+        time_multiplier=3.0,
         display_name="Python 3.11",
         source_filename="solution.py",
         # Byte-compiling first turns a SyntaxError into a Compilation Error
@@ -88,6 +92,7 @@ LANGUAGES: dict[str, LanguageSpec] = {
     ),
     Language.JAVA.value: LanguageSpec(
         id=Language.JAVA.value,
+        time_multiplier=2.0,
         display_name="Java 21",
         source_filename="Main.java",
         compile_cmd=["javac", "-encoding", "UTF-8", "Main.java"],
@@ -118,6 +123,7 @@ LANGUAGES: dict[str, LanguageSpec] = {
     # RLIMIT_AS and caps its own heap instead.
     Language.JAVASCRIPT.value: LanguageSpec(
         id=Language.JAVASCRIPT.value,
+        time_multiplier=2.0,
         display_name="JavaScript (Node.js 24)",
         source_filename="solution.js",
         # A syntax check, so a typo is a Compilation Error, not a Runtime Error.
@@ -132,6 +138,7 @@ LANGUAGES: dict[str, LanguageSpec] = {
     # runs "erasable" TypeScript (no enums or namespaces) as fast as JS.
     Language.TYPESCRIPT.value: LanguageSpec(
         id=Language.TYPESCRIPT.value,
+        time_multiplier=2.0,
         display_name="TypeScript (Node.js 24)",
         source_filename="solution.ts",
         compile_cmd=None,
@@ -172,6 +179,7 @@ LANGUAGES: dict[str, LanguageSpec] = {
     ),
     Language.RUBY.value: LanguageSpec(
         id=Language.RUBY.value,
+        time_multiplier=3.0,
         display_name="Ruby 3.3",
         source_filename="solution.rb",
         compile_cmd=["ruby", "-c", "solution.rb"],
@@ -181,6 +189,7 @@ LANGUAGES: dict[str, LanguageSpec] = {
     ),
     Language.PHP.value: LanguageSpec(
         id=Language.PHP.value,
+        time_multiplier=3.0,
         display_name="PHP 8.4",
         source_filename="solution.php",
         compile_cmd=["php", "-l", "solution.php"],
@@ -208,6 +217,7 @@ def supported_languages() -> list[dict]:
             "name": spec.display_name,
             "compiled": spec.needs_compile,
             "docker_image": spec.docker_image,
+            "time_multiplier": spec.time_multiplier,
         }
         for spec in LANGUAGES.values()
     ]
