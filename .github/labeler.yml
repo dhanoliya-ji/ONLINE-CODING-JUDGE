@@ -1,0 +1,33 @@
+# Path rules for the PR labeler (.github/workflows/labeler.yml).
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file: [app/**, requirements.txt, create_tables.py]
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: frontend/**
+
+judge:
+  - changed-files:
+      - any-glob-to-any-file: app/execution/**
+
+database:
+  - changed-files:
+      - any-glob-to-any-file: [app/models/**, app/database.py, create_tables.py]
+
+infra:
+  - changed-files:
+      - any-glob-to-any-file: [Dockerfile, docker-compose.yml, .dockerignore]
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file: tests/**
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: ["**/*.md", docs/**]
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: .github/**
