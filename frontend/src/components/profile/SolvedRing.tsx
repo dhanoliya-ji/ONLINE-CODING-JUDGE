@@ -13,13 +13,12 @@ export function SolvedRing({ progress }: { progress: { difficulty: string; solve
   const circumference = 2 * Math.PI * radius;
   // Each arc's length is its share of everything available, so the ring
   // fills up as the library is worked through.
-  let offset = 0;
-  const arcs = rows.map((r) => {
-    const length = available ? (r.solved / available) * circumference : 0;
-    const arc = { difficulty: r.difficulty, length, offset };
-    offset += length;
-    return arc;
-  });
+  const lengths = rows.map((r) => (available ? (r.solved / available) * circumference : 0));
+  const arcs = rows.map((r, i) => ({
+    difficulty: r.difficulty,
+    length: lengths[i],
+    offset: lengths.slice(0, i).reduce((sum, l) => sum + l, 0),
+  }));
 
   const summary = rows.map((r) => `${r.solved} ${r.difficulty.toLowerCase()}`).join(", ");
 

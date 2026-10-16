@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const DAY = 86_400_000;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -27,9 +27,11 @@ const iso = (time: number) => new Date(time).toISOString().slice(0, 10);
  * at the top. Days are UTC, matching the API.
  */
 export function Heatmap({ activity }: { activity: { date: string; submissions: number; accepted: number }[] }) {
+  // Read the clock once per mount, not on every render.
+  const [now] = useState(() => Date.now());
   const { weeks, months, total } = useMemo(() => {
     const byDay = new Map(activity.map((a) => [a.date, a]));
-    const today = Date.parse(iso(Date.now()));
+    const today = Date.parse(iso(now));
     // Start on the Sunday 52 weeks before this week's Sunday.
     const thisSunday = today - new Date(today).getUTCDay() * DAY;
     const start = thisSunday - 52 * 7 * DAY;
@@ -52,7 +54,7 @@ export function Heatmap({ activity }: { activity: { date: string; submissions: n
     }
     const total = activity.reduce((sum, a) => sum + a.submissions, 0);
     return { weeks, months, total };
-  }, [activity]);
+  }, [activity, now]);
 
   // When the grid is wider than its card, start at the recent end.
   const scroller = useRef<HTMLDivElement>(null);
