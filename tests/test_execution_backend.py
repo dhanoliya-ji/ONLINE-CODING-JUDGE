@@ -119,3 +119,15 @@ class TestLocalBackendBehaviour:
         )
         assert result.outcome is Outcome.OK
         assert result.stdout.strip() == "False False"
+
+    def test_python_falls_back_to_the_running_interpreter(self, monkeypatch):
+        # Slim images can ship Python without a `python` or `python3` on PATH.
+        # The fallback to sys.executable used to raise NameError, because
+        # local_backend never imported sys -- turning every Python submission
+        # on such a host into a 500.
+        import sys
+
+        from app.execution import local_backend
+
+        monkeypatch.setattr(local_backend.shutil, "which", lambda _name: None)
+        assert local_backend._which("python") == sys.executable
