@@ -251,7 +251,7 @@ flowchart LR
 | Language | Python 3.11 | `X \| Y` unions, `StrEnum`, better tracebacks |
 | ORM | SQLAlchemy 2.0 | Typed `Mapped[...]` models, modern `select()` API |
 | Database | PostgreSQL 16+ (Neon) | Real constraints and aggregates; SQLite for zero-setup dev |
-| Auth | python-jose + bcrypt | Standard bearer tokens; bcrypt called directly, not via passlib |
+| Auth | PyJWT + bcrypt | Standard bearer tokens; bcrypt called directly, not via passlib |
 | Sandbox | Docker SDK, POSIX rlimits | Container isolation, with a documented fallback |
 | Tests | pytest + httpx | Full-stack tests over real HTTP, no external services |
 | CI/CD | GitHub Actions | Tests, seed verification and an image build on every push |

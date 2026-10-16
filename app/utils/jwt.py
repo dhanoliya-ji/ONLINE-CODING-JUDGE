@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 
 from app.config import settings
 
@@ -49,7 +50,7 @@ def decode_access_token(token: str) -> dict | None:
             # from presenting an `alg: none` or HMAC-vs-RSA confusion token.
             algorithms=[settings.ALGORITHM],
         )
-    except JWTError as exc:
+    except InvalidTokenError as exc:
         logger.debug("Rejected token: %s", exc)
         return None
 
