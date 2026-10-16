@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.routes import (
     auth,
+    coach,
     contest_problems,
     contests,
     dashboard,
@@ -21,6 +22,7 @@ api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(auth.router)
 api_router.include_router(problems.router)
+api_router.include_router(coach.router)
 api_router.include_router(test_cases.router)
 api_router.include_router(submissions.router)
 api_router.include_router(contests.router)

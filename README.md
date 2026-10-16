@@ -183,7 +183,8 @@ locally and still deploy to a free host that forbids it.
 </td><td width="50%" valign="top">
 
 **Submissions & judging**
-- Python 3.11, C++17 (GCC), Java 21
+- 10 languages: Python, C, C++, Java, JavaScript,
+  TypeScript, Go, Rust, Ruby, PHP
 - Seven verdicts incl. Compilation Error and MLE
 - Real execution time and peak memory
 - Per-test breakdown; diffs for samples only
@@ -198,6 +199,13 @@ locally and still deploy to a free host that forbids it.
 - Window and registration enforced on submit
 - Labels (A, B, C…) and per-problem points
 - Leaderboard with ICPC penalty, tie-aware ranks
+
+**Practice coach (AI, free)**
+- Chat on the Solve page: approach, hints, debugging, anything
+- Sees the problem, your code and your last verdict
+- Guides first; full solutions only when asked
+- **Off during contests**, enforced by the server
+- Groq with Gemini fallback, per-user daily limit
 
 **Frontend & operations**
 - React 19 + TypeScript, glassmorphic UI
@@ -385,7 +393,6 @@ that documents its edges.
 - [ ] **Rate limiting** — per-user submission throttle
 - [ ] **Alembic migrations** — once the schema must change under real data
 - [ ] **Dedicated judge workers** — isolate execution from the credential-holding host
-- [ ] **More languages** — Go, Rust, JavaScript (one `LanguageSpec` each)
 - [ ] **Special judges** — checker programs for problems with multiple valid answers
 - [ ] **Rejudge** — re-run a problem's submissions after a test-suite fix
 - [ ] **Editorials and problem tags**

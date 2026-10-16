@@ -5,6 +5,7 @@ what ``Base.metadata.create_all()`` and the test fixtures rely on.
 """
 
 from app.models.base import Base, TimestampMixin, utcnow
+from app.models.coach_usage import CoachUsage
 from app.models.contest import Contest
 from app.models.contest_problem import ContestProblem
 from app.models.contest_registration import ContestRegistration
@@ -24,6 +25,7 @@ __all__ = [
     "Base",
     "TimestampMixin",
     "utcnow",
+    "CoachUsage",
     "Contest",
     "ContestProblem",
     "ContestRegistration",

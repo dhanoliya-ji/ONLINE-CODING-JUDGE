@@ -10,6 +10,7 @@ import type {
   Submission,
   TestCasePublic,
 } from "../lib/types";
+import { CoachPanel } from "../components/CoachPanel";
 import { CodeEditor, STARTERS } from "../components/CodeEditor";
 import { Markdown } from "../components/Markdown";
 import {
@@ -378,8 +379,31 @@ export function Solve() {
           </Card>
         </div>
       </div>
+
+      <CoachPanel
+        key={problem.slug}
+        slug={problem.slug}
+        code={code}
+        language={language}
+        verdict={lastVerdict(result, runResult)}
+      />
     </div>
   );
+}
+
+/** What the student last saw, in words the coach can reason about. */
+function lastVerdict(result: Submission | null, run: RunResult | null): string | null {
+  if (result) {
+    const where =
+      result.failed_test_index != null ? ` on test ${result.failed_test_index}` : "";
+    const detail = result.error_message ? `: ${result.error_message}` : "";
+    return `Submitted: ${result.verdict}${where} (${result.passed_tests}/${result.total_tests} passed)${detail}`.slice(0, 200);
+  }
+  if (run) {
+    const detail = run.compile_output || run.stderr;
+    return `Ran on custom input: ${run.outcome}${detail ? `: ${detail}` : ""}`.slice(0, 200);
+  }
+  return null;
 }
 
 /* ------------------------------------------------------------- helpers */

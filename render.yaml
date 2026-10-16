@@ -62,6 +62,12 @@ services:
         value: "128"
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "1440"
+      # Practice coach. Free keys, no card: console.groq.com/keys and
+      # aistudio.google.com/apikey. Either or both; Render asks on first deploy.
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
 
   # ----------------------------------------------------------- Frontend --
   - type: web
