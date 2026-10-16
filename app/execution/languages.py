@@ -33,6 +33,10 @@ class LanguageSpec:
     memory_flag_template: list[str] = field(default_factory=list)
     #: Extra environment for both compiling and running, on either backend.
     env: dict[str, str] = field(default_factory=dict)
+    #: For runtimes that can neither live under RLIMIT_AS nor cap their own
+    #: heap (Go): the local backend kills the run once its resident memory
+    #: passes the limit.
+    enforce_rss_limit: bool = False
 
     @property
     def needs_compile(self) -> bool:
@@ -147,6 +151,11 @@ LANGUAGES: dict[str, LanguageSpec] = {
         docker_image="golang:1.24",
         local_requirements=("go",),
         artifact="solution",
+        # The Go runtime reserves its heap arena map up front and dies with
+        # "failed to reserve page summary memory" under RLIMIT_AS, and it has
+        # no hard heap cap of its own -- so resident memory is policed instead.
+        supports_address_space_limit=False,
+        enforce_rss_limit=True,
         # Never fetch a toolchain or a module: a submission is one file, and
         # the sandbox has no business on the network.
         env={"GOTOOLCHAIN": "local", "GOPROXY": "off", "CGO_ENABLED": "0"},

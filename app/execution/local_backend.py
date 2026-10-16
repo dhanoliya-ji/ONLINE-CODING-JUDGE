@@ -199,7 +199,10 @@ class LocalBackend(SandboxBackend):
             # approach diffed getrusage(RUSAGE_CHILDREN).ru_maxrss, which is a
             # high-water mark across *every* child the process has ever reaped —
             # so it reported 0 for any run that did not beat the all-time peak.
-            monitor = _PeakMemoryMonitor(process.pid)
+            monitor = _PeakMemoryMonitor(
+                process.pid,
+                limit_kb=request.memory_limit_mb * 1024 if spec.enforce_rss_limit else None,
+            )
             monitor.start()
 
             stdout_text, stderr_text = process.communicate(
@@ -315,8 +318,10 @@ def _resolve_argv(argv: list[str], workdir: str) -> list[str]:
 
 # Inherited from the server's environment when set: the Docker image points
 # GOCACHE at a cache it warmed at build time, so the first Go submission does
-# not spend its compile budget rebuilding the standard library.
-_PASSTHROUGH_ENV = ("GOCACHE", "GOROOT")
+# not spend its compile budget rebuilding the standard library. Where Rust is
+# installed through rustup, `rustc` is a proxy that needs RUSTUP_HOME to find
+# the real compiler -- HOME is rewritten below, so the default lookup fails.
+_PASSTHROUGH_ENV = ("GOCACHE", "GOROOT", "RUSTUP_HOME", "CARGO_HOME")
 
 
 def _sandbox_env(spec: LanguageSpec | None = None) -> dict[str, str]:
@@ -384,11 +389,16 @@ class _PeakMemoryMonitor(threading.Thread):
 
     Elsewhere there is no cheap per-process equivalent, so this reports 0 and
     ``/health`` advertises memory reporting as unavailable.
+
+    Given ``limit_kb``, it also enforces: the process group is killed as soon
+    as a sample exceeds the limit, which surfaces as SIGKILL with a peak at
+    the limit -- a Memory Limit Exceeded verdict.
     """
 
-    def __init__(self, pid: int) -> None:
+    def __init__(self, pid: int, limit_kb: int | None = None) -> None:
         super().__init__(daemon=True)
         self._pid = pid
+        self._limit_kb = limit_kb
         self._peak_kb = 0
         self._stop_event = threading.Event()
 
@@ -406,6 +416,12 @@ class _PeakMemoryMonitor(threading.Thread):
             except (OSError, ValueError, IndexError):
                 # The process exited, or this is not Linux. Either way the last
                 # sample we took is the best answer available.
+                break
+            if self._limit_kb is not None and self._peak_kb > self._limit_kb:
+                try:
+                    os.killpg(self._pid, signal.SIGKILL)
+                except OSError:
+                    pass
                 break
             self._stop_event.wait(0.01)
 
