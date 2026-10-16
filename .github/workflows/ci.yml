@@ -55,7 +55,21 @@ jobs:
         # on "image not found" instead of exercising the sandbox.
         run: docker pull python:3.11-slim
 
+      - name: Set up Node.js 24
+        # Node 24 runs TypeScript natively; the runner's default Node does not.
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
       - name: Run tests
+        env:
+          # Every language's toolchain must be present here: a missing one
+          # fails the run instead of quietly skipping its tests.
+          REQUIRE_ALL_TOOLCHAINS: "1"
+          # The runner's rustc is a rustup proxy; the sandbox resets HOME, so
+          # point it at the installed toolchains explicitly.
+          RUSTUP_HOME: /home/runner/.rustup
+          CARGO_HOME: /home/runner/.cargo
         run: pytest -q --cov=app --cov-report=xml
 
       - name: Verify the seed data is self-consistent
@@ -80,6 +94,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Build image
         run: docker build -t online-coding-judge:ci .
+
+      - name: Every language runs inside the image
+        # The image is what Render deploys, so this is the test that matters:
+        # all ten languages accepted, compile errors, time and memory limits,
+        # judged by the same sandbox the live site uses.
+        run: |
+          docker run --rm \
+            -e REQUIRE_ALL_TOOLCHAINS=1 \
+            -e DATABASE_URL=sqlite:///./languages.db \
+            -e SECRET_KEY=ci-secret \
+            -e EXECUTION_BACKEND=local \
+            online-coding-judge:ci \
+            python -m pytest tests/test_languages.py -q -p no:cacheprovider -o addopts=""
       - name: Container starts and answers its health check
         run: |
           docker run -d --name judge \
