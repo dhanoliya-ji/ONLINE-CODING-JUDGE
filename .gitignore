@@ -53,3 +53,8 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Test coverage output (uploaded to Codecov by CI, never committed)
+coverage/
+.coverage
+coverage.xml
