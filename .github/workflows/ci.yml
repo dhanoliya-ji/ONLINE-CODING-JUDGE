@@ -70,6 +70,9 @@ jobs:
           # point it at the installed toolchains explicitly.
           RUSTUP_HOME: /home/runner/.rustup
           CARGO_HOME: /home/runner/.cargo
+          # The runner's first rustc call can stall on toolchain setup, which
+          # is not what the language tests are measuring.
+          EXECUTION_COMPILE_TIMEOUT_S: "60"
         run: pytest -q --cov=app --cov-report=xml
 
       - name: Verify the seed data is self-consistent
@@ -118,6 +121,8 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Pull the Python sandbox image
+        run: docker pull python:3.11-slim
       - name: Migrate an empty database, as a fresh deploy does
         run: python -m app.migrate
       - name: Run tests

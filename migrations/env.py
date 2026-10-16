@@ -10,6 +10,7 @@ from __future__ import annotations
 from alembic import context
 
 from app.database import engine
+from app.migrate import include_object
 from app.models import Base
 
 target_metadata = Base.metadata
@@ -32,6 +33,7 @@ def _run(connection) -> None:
         # table instead, which keeps one set of migrations for both dialects.
         render_as_batch=connection.dialect.name == "sqlite",
         compare_type=True,
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()

@@ -32,8 +32,27 @@ MIGRATIONS = Path(__file__).resolve().parents[1] / "migrations"
 BASELINE = "0001"
 _LOCK_KEY = 0x4A55_4447  # any constant; "JUDG"
 
+#: Indexes created by migrations but not declared on the models, because
+#: they only exist on Postgres. Comparisons with the models must skip them.
+POSTGRES_ONLY_INDEXES = {"ix_problems_fulltext"}
 
-def upgrade_database(engine: Engine | None = None) -> None:
+SEARCH_INDEX_DDL = (
+    "CREATE INDEX IF NOT EXISTS ix_problems_fulltext ON problems "
+    "USING gin (to_tsvector('english', title || ' ' || description))"
+)
+
+
+def include_object(obj, name, type_, reflected, compare_to) -> bool:
+    """Alembic filter: leave the Postgres-only indexes out of comparisons."""
+    return not (type_ == "index" and name in POSTGRES_ONLY_INDEXES)
+
+
+def schema_differences(connection) -> list:
+    context = MigrationContext.configure(connection, opts={"include_object": include_object})
+    return compare_metadata(context, Base.metadata)
+
+
+def upgrade_database(engine: Engine | None = None, revision: str = "head") -> None:
     engine = engine or default_engine
     postgres = engine.dialect.name == "postgresql"
 
@@ -48,13 +67,16 @@ def upgrade_database(engine: Engine | None = None) -> None:
 
             tables = set(inspect(connection).get_table_names())
             if "alembic_version" not in tables and "problems" in tables:
-                current = not compare_metadata(MigrationContext.configure(connection), Base.metadata)
-                revision = "head" if current else BASELINE
-                logger.info("Database without migration history: stamping %s", revision)
-                command.stamp(config, revision)
+                stamp_at = BASELINE if schema_differences(connection) else "head"
+                logger.info("Database without migration history: stamping %s", stamp_at)
+                command.stamp(config, stamp_at)
                 connection.commit()
 
-            command.upgrade(config, "head")
+            command.upgrade(config, revision)
+            if postgres and revision == "head":
+                # A database stamped at head skipped the migration that
+                # creates this index, so make sure it exists either way.
+                connection.execute(text(SEARCH_INDEX_DDL))
             connection.commit()
         finally:
             if postgres:

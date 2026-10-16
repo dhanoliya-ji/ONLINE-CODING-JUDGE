@@ -10,6 +10,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
+from app.migrate import SEARCH_INDEX_DDL
+
 revision = '0002'
 down_revision = '0001'
 branch_labels = None
@@ -47,10 +49,7 @@ def upgrade() -> None:
     # development) falls back to LIKE. The expression must stay identical to
     # the one in app/services/catalogue.py, or the planner will not use it.
     if op.get_bind().dialect.name == "postgresql":
-        op.execute(
-            "CREATE INDEX IF NOT EXISTS ix_problems_fulltext ON problems "
-            "USING gin (to_tsvector('english', title || ' ' || description))"
-        )
+        op.execute(SEARCH_INDEX_DDL)
 
 
 def downgrade() -> None:
