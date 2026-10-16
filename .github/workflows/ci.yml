@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# Read-only unless a job asks for more.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Test suite
@@ -25,9 +29,9 @@ jobs:
       ENVIRONMENT: development
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
           cache: pip
@@ -73,7 +77,7 @@ jobs:
     name: Docker image builds
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Build image
         run: docker build -t online-coding-judge:ci .
       - name: Container starts and answers its health check
