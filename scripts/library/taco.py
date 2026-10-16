@@ -122,28 +122,36 @@ def _kind(heading: str) -> str | None:
     return _HEADINGS.get(name)
 
 
-_PLAIN = re.compile(r"^[ \t]*(Input|Output|Examples?|Note)[ \t]*$", re.MULTILINE)
+_PLAIN = re.compile(r"^[ \t]*(Input|Output|Examples?|Note|Constraints)[ \t]*$", re.MULTILINE)
 #: In the older Codeforces text a constraint like 10^6 was flattened to 106.
 #: A bound written as "≤ 10" followed by digits cannot be trusted.
 _FLATTENED = re.compile(r"(≤|≥|<|>|\bto\b)\s*-?\s*\d*\s*·?\s*10\d{1,2}\b")
 
 
 def dash_plain_headings(question: str) -> str:
-    """Rewrite the older Codeforces headings ("Input" alone on a line) as dashed ones.
+    """Rewrite plain headings ("Input" alone on a line) as dashed ones.
 
-    Only the first Input, the Output after it, the Examples after that and a
-    trailing Note become headings; the "Input"/"Output" lines inside the
-    examples block stay as they are, as in the newer text.
+    Used for the older Codeforces text and the AtCoder rows from the same
+    crawl. Headings are taken in order -- Input, Output, Examples, Note --
+    plus one Constraints anywhere before Examples, so the "Input"/"Output"
+    lines inside the examples block stay as they are, as in the newer text.
     """
-    wanted = [("Input",), ("Output",), ("Example", "Examples"), ("Note",)]
+    order = ["Input", "Output", "Example", "Note"]
+    stage, constraints_seen = 0, False
     pieces, position = [], 0
-    for names in wanted:
-        for match in _PLAIN.finditer(question, position):
-            if match.group(1) in names:
-                pieces.append(question[position : match.start()])
-                pieces.append(f"-----{match.group(1)}-----")
-                position = match.end()
-                break
+    for match in _PLAIN.finditer(question):
+        name = match.group(1)
+        kind = "Example" if name.startswith("Example") else name
+        if kind == "Constraints":
+            take = not constraints_seen and stage < 3
+            constraints_seen = constraints_seen or take
+        else:
+            take = stage < len(order) and kind == order[stage]
+            stage += take
+        if take:
+            pieces.append(question[position : match.start()])
+            pieces.append(f"-----{name}-----")
+            position = match.end()
     pieces.append(question[position:])
     return "".join(pieces)
 
@@ -385,10 +393,11 @@ def candidate_from_row(row: dict, resolve_atcoder: AtCoderResolver | None = None
     external_id, url = identity(source, url)
 
     question = row.get("question") or ""
-    if source == "codeforces" and "-----Input-----" not in question:
-        # The older (CodeContests) text flattened exponents, so "10^6" may
-        # read "106". Keep it only when no bound looks like that.
-        if _FLATTENED.search(question):
+    if source in ("codeforces", "atcoder") and not _DASHED.search(question):
+        # The older (CodeContests) crawl uses plain headings. Its Codeforces
+        # text also flattened exponents, so "10^6" may read "106": keep it
+        # only when no bound looks like that. (Its AtCoder text kept LaTeX.)
+        if source == "codeforces" and _FLATTENED.search(question):
             raise Skip("statement lost its formatting")
         question = dash_plain_headings(question)
     check_statement(question)
