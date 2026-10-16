@@ -1,5 +1,7 @@
 import type {
   AuthResponse,
+  CoachMessage,
+  CoachStatus,
   Contest,
   ContestProblem,
   Dashboard,
@@ -166,6 +168,23 @@ export const api = {
     offset?: number;
   }) => request<Page<ProblemSummary>>(`/problems${qs(params)}`),
   problem: (identifier: string | number) => request<Problem>(`/problems/${identifier}`),
+  coachStatus: (identifier: string | number) =>
+    request<CoachStatus>(`/problems/${identifier}/coach`),
+  askCoach: (
+    identifier: string | number,
+    body: {
+      messages: CoachMessage[];
+      code: string | null;
+      language: string | null;
+      verdict: string | null;
+    },
+  ) =>
+    // A thoughtful reply from a free model can take a while.
+    request<{ reply: string; remaining_today: number }>(`/problems/${identifier}/coach`, {
+      method: "POST",
+      body,
+      timeoutMs: 90_000,
+    }),
   testCases: (problemId: number) =>
     request<TestCasePublic[]>(`/testcases/problem/${problemId}`),
 

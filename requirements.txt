@@ -17,9 +17,11 @@ psycopg2-binary==2.9.13
 python-jose[cryptography]==3.5.0
 bcrypt==5.0.0
 
+# ---- Practice coach (calls the AI provider's HTTP API) -------------------
+httpx==0.28.1
+
 # ---- Code execution sandbox ---------------------------------------------
 docker==7.2.0
 
 # ---- Tests ---------------------------------------------------------------
 pytest==9.1.1
-httpx==0.28.1

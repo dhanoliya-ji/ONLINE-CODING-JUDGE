@@ -60,6 +60,18 @@ class Settings(BaseSettings):
     #: absolute path on both sides makes the path valid for both.
     EXECUTION_WORKDIR: str = ""
 
+    # ---- Practice coach (AI) ---------------------------------------------
+    # Both are free without a card: https://console.groq.com/keys and
+    # https://aistudio.google.com/apikey. Set either or both; with both, Groq
+    # answers and Gemini takes over when Groq is rate-limited or down. With
+    # neither, the coach reports itself unavailable and the rest still works.
+    GROQ_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
+    COACH_GROQ_MODEL: str = "openai/gpt-oss-120b"
+    COACH_GEMINI_MODEL: str = "gemini-2.5-flash"
+    #: Replies per user per UTC day, so one user cannot spend everyone's quota.
+    COACH_DAILY_LIMIT: int = Field(default=40, ge=1, le=1000)
+
     # ------------------------------------------------------------------ #
     # Derived helpers
     # ------------------------------------------------------------------ #

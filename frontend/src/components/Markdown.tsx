@@ -9,8 +9,9 @@ import { Fragment, type ReactNode } from "react";
  * handful of inline forms avoids pulling a full parser (and its sanitiser)
  * into the bundle for what is essentially bold, code and bullets.
  *
- * Supported: `**bold**`, `*italic*`, `` `code` ``, `- ` bullets, blank-line
- * paragraphs. Everything else renders as literal text.
+ * Supported: `**bold**`, `*italic*`, `` `code` ``, `- ` and `1. ` lists,
+ * `#` headings, blank-line paragraphs. Everything else renders as literal
+ * text.
  */
 export function Markdown({ text }: { text: string }) {
   const blocks = text.replace(/\r\n/g, "\n").split(/\n{2,}/);
@@ -20,6 +21,27 @@ export function Markdown({ text }: { text: string }) {
       {blocks.map((block, index) => {
         const lines = block.split("\n");
         const isList = lines.every((line) => /^\s*[-*]\s+/.test(line));
+        const isOrdered = lines.every((line) => /^\s*\d+[.)]\s+/.test(line));
+
+        if (lines.length === 1 && /^#{1,6}\s+/.test(block)) {
+          return (
+            <p key={index} className={`font-semibold text-violet-50 ${index > 0 ? "mt-4" : ""}`}>
+              <Inline text={block.replace(/^#{1,6}\s+/, "")} />
+            </p>
+          );
+        }
+
+        if (isOrdered) {
+          return (
+            <ol key={index} className="my-2 ml-5 list-decimal space-y-1">
+              {lines.map((line, lineIndex) => (
+                <li key={lineIndex}>
+                  <Inline text={line.replace(/^\s*\d+[.)]\s+/, "")} />
+                </li>
+              ))}
+            </ol>
+          );
+        }
 
         if (isList) {
           return (

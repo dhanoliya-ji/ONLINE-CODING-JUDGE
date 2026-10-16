@@ -105,6 +105,18 @@ export interface Submission {
   test_results?: TestCaseResult[];
 }
 
+export interface CoachMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface CoachStatus {
+  available: boolean;
+  reason: string | null;
+  daily_limit: number;
+  remaining_today: number | null;
+}
+
 export interface RunResult {
   outcome: string;
   stdout: string;
