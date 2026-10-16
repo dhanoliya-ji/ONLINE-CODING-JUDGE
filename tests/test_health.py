@@ -64,3 +64,36 @@ def test_a_database_failure_is_reported_without_its_detail(client):
     assert body["status"] == "degraded"
     assert body["database"] == {"connected": False, "error": "database unreachable"}
     assert "hunter2" not in response.text and "db.internal" not in response.text
+
+
+def test_startup_survives_another_worker_creating_tables_first(monkeypatch):
+    # Two uvicorn workers booting on a fresh database race to CREATE TABLE.
+    # The loser used to crash with "table ... already exists".
+    from sqlalchemy.exc import OperationalError
+
+    import app.main as main
+
+    calls = []
+
+    def create_all(**_kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            raise OperationalError("CREATE TABLE contest_problems", {}, Exception("table contest_problems already exists"))
+
+    monkeypatch.setattr(main.Base.metadata, "create_all", create_all)
+    main._create_tables()
+    assert len(calls) == 2
+
+
+def test_a_real_database_error_at_startup_still_surfaces(monkeypatch):
+    from sqlalchemy.exc import OperationalError
+
+    import app.main as main
+    import pytest
+
+    def create_all(**_kwargs):
+        raise OperationalError("SELECT 1", {}, Exception("unable to open database file"))
+
+    monkeypatch.setattr(main.Base.metadata, "create_all", create_all)
+    with pytest.raises(OperationalError):
+        main._create_tables()

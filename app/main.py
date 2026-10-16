@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import DatabaseError, SQLAlchemyError
 
 from app.config import settings
 from app.database import engine
@@ -42,6 +42,23 @@ backend is active.
 """
 
 
+def _create_tables() -> None:
+    """Create any missing tables, tolerating a race with other workers.
+
+    The image runs `uvicorn --workers 2`, and every worker runs this lifespan.
+    On a fresh database both can see a table missing and both issue CREATE
+    TABLE; the loser fails with "table ... already exists" and takes its
+    worker down. That is a race, not an error: a second pass finds every
+    table and creates nothing. A genuine database problem fails the second
+    pass the same way, so it still surfaces.
+    """
+    try:
+        Base.metadata.create_all(bind=engine)
+    except DatabaseError:
+        logger.info("Another worker was creating tables at the same time; re-checking")
+        Base.metadata.create_all(bind=engine)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(
@@ -54,7 +71,7 @@ async def lifespan(app: FastAPI):
     # Idempotent: creates only what is missing. Safe to run on every boot,
     # which is what makes a fresh Render/Neon deployment work with no manual
     # migration step.
-    Base.metadata.create_all(bind=engine)
+    _create_tables()
 
     from app.execution.engine import get_backend
 
