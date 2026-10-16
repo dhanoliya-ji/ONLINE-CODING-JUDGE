@@ -340,6 +340,19 @@ def _seed_contest(db, admin: User, problems: list[Problem]) -> None:
     print(f"Created contest {title!r} with {min(len(problems), 4)} problems")
 
 
+def _shown(env_var: str, published_default: str) -> str:
+    """What the summary may print for a seeded credential.
+
+    The published defaults are already in this file, so echoing them costs
+    nothing and saves a trip to the README. A value supplied through the
+    environment is a real credential - exactly what DEPLOYMENT.md tells you to
+    use for a public deployment - and must never land in a deploy log.
+    """
+    if os.getenv(env_var):
+        return f"(from {env_var}, not shown)"
+    return published_default
+
+
 def _print_summary() -> None:
     admin_email = next(iter(settings.admin_email_set), DEFAULT_ADMIN_EMAIL)
     print(
@@ -347,8 +360,8 @@ def _print_summary() -> None:
         "-------------------------------------------------------------\n"
         " Seed complete.\n"
         "\n"
-        f"   Admin : {admin_email} / {DEFAULT_ADMIN_PASSWORD}\n"
-        f"   Demo  : demo@example.com / {DEFAULT_DEMO_PASSWORD}\n"
+        f"   Admin : {admin_email} / {_shown('SEED_ADMIN_PASSWORD', 'AdminPass123')}\n"
+        f"   Demo  : demo@example.com / {_shown('SEED_DEMO_PASSWORD', 'DemoPass123')}\n"
         "\n"
         " Change these before exposing the deployment publicly.\n"
         "-------------------------------------------------------------"

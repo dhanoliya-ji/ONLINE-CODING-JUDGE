@@ -117,7 +117,15 @@ class DockerBackend(SandboxBackend):
         if staging:
             os.makedirs(staging, exist_ok=True)
 
-        with tempfile.TemporaryDirectory(prefix="judge-", dir=staging) as workdir:
+        # Two levels. The outer directory comes from mkdtemp, which creates it
+        # 0o700: only this process's user can enter it. The inner one is the
+        # bind mount, and has to be world-writable because the container runs
+        # as `nobody` (see _materialise). Nesting it is what keeps "world" from
+        # meaning every user on the host: they cannot get past the outer
+        # directory, while the Docker daemon mounts the inner path directly.
+        with tempfile.TemporaryDirectory(prefix="judge-", dir=staging) as private:
+            workdir = os.path.join(private, "box")
+            os.mkdir(workdir)
             try:
                 self._materialise(workdir, spec, request)
             except OSError as exc:
@@ -145,6 +153,7 @@ class DockerBackend(SandboxBackend):
         (base / "input.txt").write_text(request.stdin, encoding="utf-8")
         # The container runs as `nobody`, which does not own the host-side
         # bind mount; widen the mode so the compile stage can write artefacts.
+        # Safe only because `base` sits inside a 0o700 directory - see run().
         os.chmod(base, 0o777)
         for child in base.iterdir():
             os.chmod(child, 0o666)

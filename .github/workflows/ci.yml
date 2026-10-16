@@ -45,6 +45,12 @@ jobs:
           version: "0.16.7"
           src: .
 
+      - name: Pull the Python sandbox image
+        # The Docker backend never pulls (production pre-pulls, see
+        # docs/DEPLOYMENT.md), so without this the real-sandbox test would fail
+        # on "image not found" instead of exercising the sandbox.
+        run: docker pull python:3.11-slim
+
       - name: Run tests
         run: pytest -q --cov=app --cov-report=xml
 
