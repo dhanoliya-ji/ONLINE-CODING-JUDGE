@@ -121,3 +121,23 @@ def test_year_long_demo_contest_is_ended_by_0004(blank):
     assert aware(rows["pr1"]) <= datetime.now(timezone.utc)
     assert not rated["pr1"]
     assert aware(rows["w"]) > datetime.now(timezone.utc)  # normal contests untouched
+
+
+@pytest.mark.skipif(POSTGRES, reason="Postgres uses an advisory lock; this covers SQLite's lock file")
+def test_concurrent_workers_migrate_one_at_a_time(tmp_path):
+    """The image runs two uvicorn workers; both migrate a fresh database on boot."""
+    import subprocess
+    import sys
+
+    database = (tmp_path / "race.db").as_posix()
+    script = (
+        "from sqlalchemy import create_engine\n"
+        "from app.migrate import upgrade_database\n"
+        f"upgrade_database(create_engine('sqlite:///{database}'))\n"
+    )
+    workers = [subprocess.Popen([sys.executable, "-c", script], stderr=subprocess.PIPE, text=True)
+               for _ in range(3)]
+    for worker in workers:
+        _, err = worker.communicate(timeout=120)
+        assert worker.returncode == 0, err[-2000:]
+    assert _version(create_engine(f"sqlite:///{database}")) == HEAD

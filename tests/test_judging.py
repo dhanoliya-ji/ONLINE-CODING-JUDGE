@@ -62,8 +62,10 @@ def test_hidden_test_data_never_leaves_the_server(client, user_headers, problem_
             assert result["input_data"] is None
             assert result["expected_output"] is None
             assert result["actual_output"] is None
-    # And the hidden expected values never appear anywhere in the payload.
-    assert "30" not in str(body["test_results"])
+    # And the hidden data appears in no text field anywhere in the payload.
+    # (Only text: a measured memory figure such as 2300 KB also "contains" 30.)
+    texts = [value for result in body["test_results"] for value in result.values() if isinstance(value, str)]
+    assert not any("10 20" in text or text.strip() == "30" for text in texts)
 
 
 def test_sample_results_include_a_diff(client, user_headers, problem_id):

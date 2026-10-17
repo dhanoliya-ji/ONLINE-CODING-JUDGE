@@ -7,13 +7,17 @@ One that already matches the models is stamped at the head; any other (the
 live database predates migrations) is stamped at the baseline and upgraded
 like any other, so existing data is never recreated.
 
-On Postgres the whole step holds an advisory lock, so the API's workers --
-each of which runs this on boot -- migrate one at a time instead of racing.
+The API's workers each run this on boot, so the whole step is serialised:
+an advisory lock on Postgres, a lock file next to the database on SQLite.
+Whoever goes second finds everything applied and does nothing.
 """
 
 from __future__ import annotations
 
 import logging
+import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from alembic import command
@@ -52,8 +56,47 @@ def schema_differences(connection) -> list:
     return compare_metadata(context, Base.metadata)
 
 
+@contextmanager
+def _sqlite_file_lock(engine: Engine) -> Iterator[None]:
+    """Hold an exclusive OS lock beside a SQLite database file (no-op otherwise)."""
+    database = engine.url.database
+    if engine.dialect.name != "sqlite" or not database or database == ":memory:":
+        yield
+        return
+    lock_path = Path(database).resolve().with_name(Path(database).name + ".migrate.lock")
+    with open(lock_path, "a+b") as handle:
+        if os.name == "nt":
+            import msvcrt
+
+            while True:
+                try:
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+                    break
+                except OSError:
+                    continue  # LK_LOCK gives up after ~10 s; keep waiting
+            try:
+                yield
+            finally:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+
+
 def upgrade_database(engine: Engine | None = None, revision: str = "head") -> None:
     engine = engine or default_engine
+    with _sqlite_file_lock(engine):
+        _upgrade(engine, revision)
+
+
+def _upgrade(engine: Engine, revision: str) -> None:
     postgres = engine.dialect.name == "postgresql"
 
     with engine.connect() as connection:
