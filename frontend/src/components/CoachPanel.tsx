@@ -49,11 +49,14 @@ export function CoachPanel({
   code,
   language,
   verdict,
+  variant = "floating",
 }: {
   slug: string;
   code: string;
   language: string;
   verdict: string | null;
+  /** "inline" renders the opener as a toolbar button where it is placed. */
+  variant?: "floating" | "inline";
 }) {
   const [status, setStatus] = useState<CoachStatus | null>(null);
   const [open, setOpen] = useState(false);
@@ -164,40 +167,44 @@ export function CoachPanel({
         onClick={() => setOpen(true)}
         aria-expanded={open}
         aria-controls="coach-panel"
-        className="fixed right-5 bottom-5 z-40 flex items-center gap-2 rounded-full border border-violet-300/30 bg-violet-500/90 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_40px_-8px_rgba(139,92,246,0.8)] backdrop-blur transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300"
+        className={
+          variant === "inline"
+            ? "btn-ghost inline-flex min-h-9 items-center gap-2 rounded-xl px-3 text-sm font-medium text-ink"
+            : "fixed right-5 bottom-5 z-40 flex items-center gap-2 rounded-full border border-ember/40 bg-surface px-5 py-3 text-sm font-semibold text-ink shadow-[0_14px_40px_-12px_var(--glow)] transition-transform hover:-translate-y-0.5"
+        }
       >
-        <span aria-hidden>✦</span> Ask Coach
+        <span aria-hidden className="text-ember">✦</span> {variant === "inline" ? "Coach" : "Ask Coach"}
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-[2px]" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-50 flex justify-end bg-bg/55 backdrop-blur-[3px]" onClick={() => setOpen(false)}>
           <aside
             id="coach-panel"
             role="dialog"
             aria-label="Practice coach"
             onClick={(event) => event.stopPropagation()}
-            className="flex h-full w-full max-w-md flex-col border-l border-white/10 bg-[#130f22] shadow-2xl"
+            className="flex h-full w-full max-w-md flex-col border-l border-line-strong bg-surface shadow-[-30px_0_80px_-40px_var(--glow)]"
           >
-            <header className="flex items-start justify-between gap-3 border-b border-white/8 px-5 py-4">
+            <header className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
               <div>
-                <h2 className="font-semibold text-violet-50">
-                  <span aria-hidden className="text-violet-300">✦ </span>Crucible Coach
+                <h2 className="font-display text-base font-bold text-ink">
+                  <span aria-hidden className="text-ember">✦ </span>Crucible Coach
                 </h2>
-                <p className="mt-0.5 text-xs text-violet-200/55">
+                <p className="mt-1 text-xs text-ink-3">
                   Practice only · off during contests
                   {status.remaining_today != null && ` · ${status.remaining_today} replies left today`}
                 </p>
               </div>
               <div className="flex items-center gap-1">
                 {messages.length > 0 && (
-                  <button onClick={clear} className="rounded-md px-2 py-1 text-xs text-violet-300/60 hover:bg-white/5 hover:text-violet-200">
+                  <button onClick={clear} className="min-h-8 rounded-lg px-2.5 text-xs text-ink-3 hover:bg-surface-2 hover:text-ink">
                     Clear
                   </button>
                 )}
                 <button
                   onClick={() => setOpen(false)}
                   aria-label="Close coach"
-                  className="rounded-md px-2 py-1 text-lg leading-none text-violet-200/60 hover:bg-white/5 hover:text-violet-100"
+                  className="grid size-8 place-items-center rounded-lg text-lg leading-none text-ink-3 hover:bg-surface-2 hover:text-ink"
                 >
                   ×
                 </button>
@@ -206,7 +213,7 @@ export function CoachPanel({
 
             <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4" aria-live="polite">
               {messages.length === 0 && (
-                <div className="rounded-xl border border-white/8 bg-white/[0.03] p-4 text-sm leading-relaxed text-violet-100/80">
+                <div className="rounded-xl border border-dashed border-ember/35 bg-ember/5 p-4 text-sm leading-relaxed text-ink-2">
                   Stuck, or want a second opinion? Talk through your approach, ask for a hint, or
                   ask why your code fails. I can see the problem
                   {shareCode ? ", your code and your last verdict" : ""}. I'll guide you rather than
@@ -219,8 +226,8 @@ export function CoachPanel({
                   <div
                     className={
                       message.role === "user"
-                        ? "max-w-[85%] rounded-2xl rounded-br-md bg-violet-500/25 px-4 py-2.5 text-sm whitespace-pre-wrap text-violet-50"
-                        : "text-sm leading-relaxed text-violet-100/90"
+                        ? "max-w-[85%] rounded-2xl rounded-br-md border border-ember/25 bg-ember/12 px-4 py-2.5 text-sm whitespace-pre-wrap text-ink"
+                        : "text-sm leading-relaxed text-ink-2"
                     }
                   >
                     {message.role === "user" ? message.content : <CoachReply text={message.content} />}
@@ -229,12 +236,12 @@ export function CoachPanel({
               ))}
 
               {busy && (
-                <p className="flex items-center gap-2 text-sm text-violet-300/70">
-                  <span className="inline-block size-2 animate-pulse rounded-full bg-violet-400" /> Thinking…
+                <p className="flex items-center gap-2 text-sm text-ink-3">
+                  <span className="inline-block size-2 animate-pulse rounded-full bg-ember" /> Thinking…
                 </p>
               )}
               {error && (
-                <p role="alert" className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                <p role="alert" className="rounded-lg border border-fail/30 bg-fail/10 px-3 py-2 text-sm text-fail">
                   {error}
                 </p>
               )}
@@ -242,14 +249,14 @@ export function CoachPanel({
             </div>
 
             {needsSignIn ? (
-              <div className="border-t border-white/8 px-5 py-4 text-sm text-violet-200/70">
-                <Link to="/login" state={{ from: `/problems/${slug}` }} className="font-semibold text-violet-300 hover:text-violet-200">
+              <div className="border-t border-line px-5 py-4 text-sm text-ink-2">
+                <Link to="/login" state={{ from: `/problems/${slug}` }} className="font-semibold text-ember hover:text-ember-2">
                   Sign in
                 </Link>{" "}
                 to chat with the coach. It's free.
               </div>
             ) : (
-              <form onSubmit={onSubmit} className="space-y-3 border-t border-white/8 px-5 py-4">
+              <form onSubmit={onSubmit} className="space-y-3 border-t border-line px-5 py-4">
                 <div className="flex flex-wrap gap-1.5">
                   {QUICK_ASKS.map((ask) => (
                     <button
@@ -257,7 +264,7 @@ export function CoachPanel({
                       type="button"
                       disabled={busy}
                       onClick={() => quickAsk(ask.text)}
-                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-violet-100/80 transition-colors hover:border-violet-300/40 hover:text-violet-50 disabled:opacity-50"
+                      className="chip text-xs disabled:opacity-50"
                     >
                       {ask.label}
                     </button>
@@ -275,17 +282,17 @@ export function CoachPanel({
                   rows={3}
                   maxLength={4000}
                   placeholder="Ask anything: your approach, a hint, a concept…"
-                  className="w-full resize-none rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-violet-50 placeholder:text-violet-200/35 focus:border-violet-400/60 focus:outline-none"
+                  className="field resize-none"
                 />
                 <div className="flex items-center justify-between gap-3">
-                  <label className="flex items-center gap-2 text-xs text-violet-200/60">
-                    <input type="checkbox" checked={shareCode} onChange={(event) => setShareCode(event.target.checked)} className="accent-violet-500" />
+                  <label className="flex items-center gap-2 text-xs text-ink-2">
+                    <input type="checkbox" checked={shareCode} onChange={(event) => setShareCode(event.target.checked)} className="size-4 accent-ember" />
                     Share my code
                   </label>
                   <button
                     type="submit"
                     disabled={busy || !draft.trim()}
-                    className="rounded-lg bg-violet-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-violet-400 disabled:opacity-40"
+                    className="btn-primary min-h-9 rounded-xl px-4 text-sm font-semibold"
                   >
                     Send
                   </button>
@@ -307,7 +314,7 @@ function CoachReply({ text }: { text: string }) {
     if (parts[i].trim()) out.push(<Markdown key={`t${i}`} text={parts[i].trim()} />);
     if (i + 2 < parts.length) {
       out.push(
-        <pre key={`c${i}`} className="my-3 overflow-x-auto rounded-lg border border-white/8 bg-black/40 p-3 font-mono text-[12.5px] leading-relaxed text-violet-50">
+        <pre key={`c${i}`} className="my-3 overflow-x-auto rounded-lg border border-line bg-bg-raised p-3 font-mono text-[12.5px] leading-relaxed text-ink">
           <code>{parts[i + 2].replace(/\n$/, "")}</code>
         </pre>,
       );
