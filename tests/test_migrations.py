@@ -94,3 +94,30 @@ def test_full_text_index_exists(blank, start):
             text("SELECT 1 FROM pg_indexes WHERE indexname = 'ix_problems_fulltext'")
         ).scalar()
     assert found == 1
+
+
+def test_year_long_demo_contest_is_ended_by_0004(blank):
+    """The old seed's year-long practice round must stop locking its problems."""
+    from datetime import datetime, timedelta, timezone
+
+    upgrade_database(blank, revision="0003")
+    now = datetime.now(timezone.utc)
+    with blank.begin() as connection:
+        connection.execute(
+            text("INSERT INTO contests (title, slug, description, start_time, end_time) VALUES"
+                 " ('Practice Round #1', 'pr1', 'd', :s1, :e1), ('Weekly', 'w', 'd', :s2, :e2)"),
+            {"s1": now - timedelta(days=60), "e1": now + timedelta(days=300),
+             "s2": now - timedelta(minutes=30), "e2": now + timedelta(minutes=60)},
+        )
+    upgrade_database(blank)
+    with blank.connect() as connection:
+        rows = dict(connection.execute(text("SELECT slug, end_time FROM contests")).all())
+        rated = dict(connection.execute(text("SELECT slug, rated FROM contests")).all())
+
+    def aware(value):
+        value = datetime.fromisoformat(value) if isinstance(value, str) else value
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+    assert aware(rows["pr1"]) <= datetime.now(timezone.utc)
+    assert not rated["pr1"]
+    assert aware(rows["w"]) > datetime.now(timezone.utc)  # normal contests untouched

@@ -71,6 +71,9 @@ class SubmissionSummary(ORMModel):
     execution_time_ms: float
     memory_kb: int
     created_at: datetime
+    # Filled in by list endpoints (one query per page, see with_problem_titles).
+    problem_title: str | None = None
+    problem_slug: str | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -94,6 +97,21 @@ class SubmissionResponse(SubmissionSummary):
 class SubmissionDetail(SubmissionResponse):
     """Returned straight after judging, with the per-test breakdown."""
 
-    problem_title: str | None = None
     backend: str | None = None
     test_results: list[TestCaseResult] = []
+
+
+def with_problem_titles(db, items: list[SubmissionSummary]) -> list[SubmissionSummary]:
+    """Attach each submission's problem title and slug, in one query."""
+    from sqlalchemy import select
+
+    from app.models.problem import Problem
+
+    ids = {item.problem_id for item in items}
+    if not ids:
+        return items
+    found = {pid: (title, slug) for pid, title, slug in
+             db.execute(select(Problem.id, Problem.title, Problem.slug).where(Problem.id.in_(ids)))}
+    for item in items:
+        item.problem_title, item.problem_slug = found.get(item.problem_id, (None, None))
+    return items

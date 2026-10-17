@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, String
+from sqlalchemy import Boolean, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -34,6 +34,10 @@ class User(TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default="1", nullable=False
     )
+
+    # Contest rating: unset until the first rated contest (see services/rating).
+    rating: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
+    max_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     submissions: Mapped[list["Submission"]] = relationship(
         back_populates="user",

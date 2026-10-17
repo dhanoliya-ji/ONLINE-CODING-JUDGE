@@ -1,0 +1,13 @@
+/* Imported after katex.min.css, so these win at equal specificity. KaTeX's
+   default 1.21em makes inline maths tower over the surrounding prose. */
+.katex {
+  font-size: 1.06em;
+  color: inherit;
+}
+
+.katex-display {
+  margin: 0.75em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 0.25em;
+}

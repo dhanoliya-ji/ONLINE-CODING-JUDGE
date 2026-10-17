@@ -21,6 +21,8 @@ from app.models.submission import Submission
 from app.models.test_case import TestCase
 from app.models.user import User
 from app.schemas.common import Page
+from app.services.access import can_view_problem
+from app.services.virtual import active_virtual
 from app.schemas.submission import (
     RunRequest,
     RunResponse,
@@ -29,6 +31,7 @@ from app.schemas.submission import (
     SubmissionResponse,
     SubmissionSummary,
     TestCaseResult,
+    with_problem_titles,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,13 +56,14 @@ def create_submission(
     user: User = Depends(get_current_user),
 ) -> SubmissionDetail:
     problem = db.get(Problem, payload.problem_id)
-    if problem is None or (not problem.is_public and not user.is_admin):
+    if problem is None or not can_view_problem(db, problem, user):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Problem not found"
         )
 
+    is_virtual = False
     if payload.contest_id is not None:
-        _validate_contest_submission(db, user, payload.contest_id, problem.id)
+        is_virtual = _validate_contest_submission(db, user, payload.contest_id, problem.id)
 
     test_cases = list(
         db.scalars(select(TestCase).where(TestCase.problem_id == problem.id))
@@ -74,6 +78,7 @@ def create_submission(
         user_id=user.id,
         problem_id=problem.id,
         contest_id=payload.contest_id,
+        is_virtual=is_virtual,
         language=payload.language.value,
         source_code=payload.source_code,
         status=SubmissionStatus.RUNNING.value,
@@ -208,7 +213,7 @@ def my_submissions(
     )
 
     return Page[SubmissionSummary](
-        items=[SubmissionSummary.model_validate(row) for row in rows],
+        items=with_problem_titles(db, [SubmissionSummary.model_validate(row) for row in rows]),
         total=total,
         limit=limit,
         offset=offset,
@@ -267,13 +272,21 @@ def get_submission(
 # ---------------------------------------------------------------------- #
 def _validate_contest_submission(
     db: Session, user: User, contest_id: int, problem_id: int
-) -> None:
-    """A contest-scoped submission must be legitimate on three counts."""
+) -> bool:
+    """A contest-scoped submission must be legitimate on three counts.
+
+    Returns True when it belongs to the user's virtual replay of a finished
+    contest rather than to the live contest.
+    """
     contest = db.get(Contest, contest_id)
     if contest is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Contest not found"
         )
+
+    if active_virtual(db, user, contest) is not None:
+        _require_contest_problem(db, contest_id, problem_id)
+        return True
 
     registered = db.scalar(
         select(ContestRegistration.id).where(
@@ -296,6 +309,11 @@ def _validate_contest_submission(
         )
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
 
+    _require_contest_problem(db, contest_id, problem_id)
+    return False
+
+
+def _require_contest_problem(db: Session, contest_id: int, problem_id: int) -> None:
     in_contest = db.scalar(
         select(ContestProblem.id).where(
             ContestProblem.contest_id == contest_id,

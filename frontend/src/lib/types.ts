@@ -108,6 +108,7 @@ export interface Submission {
   error_message?: string | null;
   failed_test_index?: number | null;
   problem_title?: string | null;
+  problem_slug?: string | null;
   backend?: string | null;
   test_results?: TestCaseResult[];
 }
@@ -149,6 +150,63 @@ export interface Contest {
   problem_count: number;
   participant_count: number;
   is_registered: boolean | null;
+  rated: boolean;
+  /** The automatically scheduled weekly round. */
+  is_auto: boolean;
+}
+
+export interface VirtualStatus {
+  contest_id: number;
+  started_at: string;
+  ends_at: string;
+  active: boolean;
+  entry: LeaderboardEntry;
+  virtual_rank: number;
+  real_participants: number;
+}
+
+export interface DiscussionPost {
+  id: number;
+  author: string;
+  /** null once deleted: the post keeps its place in the thread. */
+  body: string | null;
+  created_at: string;
+  edited: boolean;
+  votes: number;
+  voted_by_me: boolean;
+  mine: boolean;
+  replies: DiscussionPost[];
+}
+
+export interface ProblemListInfo {
+  id: number;
+  name: string;
+  problem_count: number;
+  created_at: string;
+}
+
+export interface Editorial {
+  problem_id: number;
+  body: string;
+  author: string;
+  created_at: string;
+}
+
+export interface BadgeInfo {
+  id: string;
+  name: string;
+  description: string;
+  earned: boolean;
+  progress: number;
+}
+
+export interface RatingPoint {
+  contest_id: number;
+  contest_title: string;
+  date: string;
+  rank: number;
+  old_rating: number;
+  new_rating: number;
 }
 
 export interface ContestProblem {
@@ -210,6 +268,58 @@ export interface Dashboard {
     accepted: number;
   }[];
   recent_submissions: Submission[];
+  activity: { date: string; submissions: number; accepted: number }[];
+  current_streak: number;
+  longest_streak: number;
+  tag_progress: { slug: string; name: string; solved: number; total: number }[];
+  global_rank: number | null;
+  member_since: string | null;
+  rating: number | null;
+  max_rating: number | null;
+  rating_history: RatingPoint[];
+  badges: BadgeInfo[];
+}
+
+export interface Facets {
+  tags: { slug: string; name: string; problem_count: number }[];
+  sources: Record<string, number>;
+  difficulties: Record<string, number>;
+}
+
+export type ProblemSort =
+  | "id"
+  | "title"
+  | "difficulty"
+  | "rating"
+  | "acceptance"
+  | "popular"
+  | "newest"
+  | "relevance";
+
+export interface ProblemQuery {
+  search?: string;
+  difficulty?: Difficulty[];
+  /** Comma-separated tag slugs; a problem must have all of them. */
+  tags?: string;
+  source?: string;
+  status?: "solved" | "attempted" | "todo";
+  sort?: ProblemSort;
+  order?: "asc" | "desc";
+  min_rating?: number;
+  max_rating?: number;
+  limit?: number;
+  offset?: number;
+}
+
+export interface LeaderboardRow {
+  rank: number;
+  username: string;
+  solved: number;
+  easy: number;
+  medium: number;
+  hard: number;
+  submissions: number;
+  acceptance_rate: number;
 }
 
 export interface Health {

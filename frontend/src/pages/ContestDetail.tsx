@@ -1,18 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { countdown, formatDate } from "../lib/format";
+import { formatDate } from "../lib/format";
 import type { Contest, ContestProblem, Leaderboard } from "../lib/types";
-import {
-  Alert,
-  Badge,
-  Button,
-  Card,
-  DifficultyBadge,
-  EmptyState,
-  Skeleton,
-} from "../components/ui";
+import { Alert, Badge, Button, Card, DifficultyBadge, EmptyState, Skeleton } from "../components/ui";
+import { Countdown, StateBadge } from "../components/problems/contest-bits";
+import { VirtualPanel } from "../components/problems/VirtualPanel";
+import { formatDuration } from "../components/problems/contest-format";
 
 export function ContestDetail() {
   const { id = "" } = useParams();
@@ -25,7 +20,6 @@ export function ContestDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
-  const [tick, setTick] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -42,9 +36,7 @@ export function ContestDetail() {
         setProblemsLocked(null);
       } else {
         // The API withholds the problem set until a contest starts.
-        setProblemsLocked(
-          problemResult.reason?.message ?? "Problems are not available yet",
-        );
+        setProblemsLocked(problemResult.reason?.message ?? "Problems are not available yet");
       }
 
       if (boardResult.status === "fulfilled") setBoard(boardResult.value);
@@ -58,12 +50,6 @@ export function ContestDetail() {
   useEffect(() => {
     load();
   }, [load]);
-
-  useEffect(() => {
-    if (!contest || contest.state === "Ended") return;
-    const timer = setInterval(() => setTick((value) => value + 1), 1000);
-    return () => clearInterval(timer);
-  }, [contest]);
 
   async function toggleRegistration() {
     if (!contest) return;
@@ -85,9 +71,13 @@ export function ContestDetail() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-6xl space-y-4 px-4 py-12 sm:px-6">
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-64 w-full" />
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-10 sm:px-6" aria-hidden="true">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-52 w-full rounded-[1.25rem]" />
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+          <Skeleton className="h-72 w-full" />
+          <Skeleton className="h-72 w-full" />
+        </div>
       </div>
     );
   }
@@ -96,77 +86,91 @@ export function ContestDetail() {
     return (
       <div className="mx-auto max-w-lg px-4 py-24">
         <Alert>{error ?? "Contest not found"}</Alert>
+        <Link to="/contests" className="mt-4 inline-block text-sm text-ember-2 hover:text-ember">
+          ← All contests
+        </Link>
       </div>
     );
   }
 
+  const live = contest.state === "Running";
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6" key={tick}>
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       <Link
         to="/contests"
-        className="mb-3 inline-block text-sm text-violet-300/70 hover:text-violet-200"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm text-ink-2 transition-colors hover:text-ink"
       >
-        ← Contests
+        <span aria-hidden="true">←</span> Contests
       </Link>
 
       {/* Header */}
-      <Card solid edge className="mb-6 p-6 sm:p-8">
-        <div className="flex flex-wrap items-start justify-between gap-5">
-          <div className="min-w-0 flex-1">
-            <div className="mb-3 flex flex-wrap items-center gap-2.5">
-              <Badge
-                tone={
-                  contest.state === "Running"
-                    ? "pass"
-                    : contest.state === "Upcoming"
-                      ? "info"
-                      : "muted"
-                }
-              >
-                {contest.state}
-              </Badge>
+      <section
+        aria-labelledby="contest-title"
+        className={[
+          "relative isolate mb-8 overflow-hidden rounded-[1.25rem] border p-6 animate-rise sm:p-8",
+          live ? "border-ember/35 bg-gradient-to-br from-ember/12 via-surface to-surface" : "border-line bg-surface",
+        ].join(" ")}
+      >
+        <span
+          className="pointer-events-none absolute -top-28 -right-20 -z-10 size-72 rounded-full bg-ember/20 blur-3xl"
+          aria-hidden="true"
+        />
+        <div className="flex flex-wrap items-start justify-between gap-6">
+          <div className="min-w-0 flex-[1_1_360px]">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <StateBadge state={contest.state} />
+              {contest.is_auto && <Badge tone="muted">Weekly</Badge>}
+              <Badge tone={contest.rated ? "warn" : "muted"}>{contest.rated ? "Rated" : "Unrated"}</Badge>
               {contest.is_registered && <Badge tone="info">✓ Registered</Badge>}
             </div>
 
-            <h1 className="text-3xl font-bold tracking-tight text-violet-50">
+            <h1 id="contest-title" className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
               {contest.title}
             </h1>
-            <p className="mt-2 max-w-2xl text-sm text-violet-200/60">
-              {contest.description}
-            </p>
+            <p className="mt-2 max-w-2xl text-sm text-ink-2">{contest.description}</p>
 
-            <dl className="mt-5 grid gap-x-8 gap-y-2 font-mono text-xs text-violet-200/50 sm:grid-cols-2">
-              <div className="flex gap-2">
-                <dt>Window</dt>
-                <dd className="text-violet-100/80">
+            <dl className="mt-5 grid gap-x-8 gap-y-3 font-mono text-xs sm:grid-cols-2">
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-ink-3">Window</dt>
+                <dd className="text-ink">
                   {formatDate(contest.start_time)} → {formatDate(contest.end_time)}
                 </dd>
               </div>
-              <div className="flex gap-2">
-                <dt>Penalty</dt>
-                <dd className="text-violet-100/80">
-                  +{contest.penalty_minutes_per_wrong} min per rejected attempt
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-ink-3">Penalty</dt>
+                <dd className="text-ink">+{contest.penalty_minutes_per_wrong} min per rejected attempt</dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-ink-3">Duration</dt>
+                <dd className="text-ink">{formatDuration(contest.duration_minutes)}</dd>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <dt className="text-ink-3">Field</dt>
+                <dd className="text-ink">
+                  {contest.problem_count} problems · {contest.participant_count} participants
                 </dd>
               </div>
             </dl>
           </div>
 
-          <div className="shrink-0 space-y-3 text-center">
+          <div className="flex w-full flex-col gap-3 sm:w-60">
             {contest.state !== "Ended" && (
-              <div className="rounded-xl border border-white/10 bg-white/5 px-6 py-4">
-                <p className="text-[10px] font-semibold tracking-wider text-violet-300/60 uppercase">
+              <div className="rounded-xl border border-line bg-bg-raised px-5 py-4 text-center">
+                <p className="font-mono text-[10px] font-medium tracking-[0.14em] text-ink-3 uppercase">
                   {contest.state === "Upcoming" ? "Starts in" : "Ends in"}
                 </p>
-                <p className="mt-1 font-mono text-2xl font-bold tabular-nums text-violet-50">
-                  {countdown(
-                    contest.state === "Upcoming"
-                      ? contest.start_time
-                      : contest.end_time,
-                  )}
+                <p className="mt-1 font-mono text-2xl font-bold text-ink tabular-nums">
+                  {/* Reload when it hits zero: the problems unseal, or the contest closes. */}
+                  <Countdown
+                    target={contest.state === "Upcoming" ? contest.start_time : contest.end_time}
+                    onElapsed={load}
+                  />
                 </p>
               </div>
             )}
 
+            {user && contest.state === "Ended" && <VirtualPanel contest={contest} />}
             {user ? (
               contest.state !== "Ended" && (
                 <Button
@@ -182,14 +186,14 @@ export function ContestDetail() {
               <Link
                 to="/login"
                 state={{ from: `/contests/${id}` }}
-                className="btn-primary block rounded-xl px-5 py-2.5 text-sm font-semibold text-white"
+                className="btn-primary inline-flex min-h-10 items-center justify-center rounded-xl px-5 text-sm font-semibold"
               >
                 Sign in to join
               </Link>
             )}
           </div>
         </div>
-      </Card>
+      </section>
 
       {error && (
         <div className="mb-6">
@@ -197,45 +201,46 @@ export function ContestDetail() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         {/* Problems */}
-        <section>
-          <h2 className="mb-4 text-lg font-semibold text-violet-50">Problems</h2>
+        <section aria-labelledby="contest-problems">
+          <SectionTitle id="contest-problems">Problems</SectionTitle>
 
           {problemsLocked ? (
             <Card solid>
-              <EmptyState
-                icon="⧗"
-                title="Problems are sealed"
-                description={problemsLocked}
-              />
+              <EmptyState icon="⧗" title="Problems are sealed" description={problemsLocked} />
             </Card>
           ) : problems.length === 0 ? (
             <Card solid>
               <EmptyState icon="◇" title="No problems in this contest yet" />
             </Card>
           ) : (
-            <ul className="space-y-3">
+            <ul className="panel divide-y divide-line overflow-hidden">
               {problems.map((entry) => (
                 <li key={entry.id}>
-                  <Link to={`/problems/${entry.problem.slug}`}>
-                    <Card hover className="flex items-center gap-4 p-4">
-                      <span
-                        className="grid size-9 shrink-0 place-items-center rounded-lg border border-violet-400/25 bg-violet-400/12 font-mono text-sm font-bold text-violet-200"
-                        aria-hidden="true"
-                      >
-                        {entry.label ?? "?"}
+                  <Link
+                    to={`/problems/${entry.problem.slug}?contest=${contest.id}`}
+                    className="group flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-surface-2"
+                  >
+                    <span
+                      className="grid size-9 shrink-0 place-items-center rounded-lg border border-ember/35 bg-ember/10 font-mono text-sm font-bold text-ember-2"
+                      aria-hidden="true"
+                    >
+                      {entry.label ?? "?"}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium text-ink transition-colors group-hover:text-ember-2">
+                        <span className="sr-only">Problem {entry.label ?? ""}: </span>
+                        {entry.problem.title}
                       </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-semibold text-violet-50">
-                          {entry.problem.title}
-                        </p>
-                        <p className="font-mono text-xs text-violet-200/45">
-                          {entry.points} points
-                        </p>
-                      </div>
-                      <DifficultyBadge difficulty={entry.problem.difficulty} />
-                    </Card>
+                      <span className="font-mono text-xs text-ink-3">{entry.points} points</span>
+                    </span>
+                    {entry.problem.solved_by_me && (
+                      <span className="text-sm font-bold text-pass" role="img" aria-label="Solved">
+                        ✓
+                      </span>
+                    )}
+                    <DifficultyBadge difficulty={entry.problem.difficulty} />
                   </Link>
                 </li>
               ))}
@@ -244,15 +249,13 @@ export function ContestDetail() {
         </section>
 
         {/* Leaderboard */}
-        <section>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-violet-50">Leaderboard</h2>
-            {board && (
-              <span className="font-mono text-xs text-violet-200/45">
-                {board.total_participants} participants
-              </span>
-            )}
-          </div>
+        <section aria-labelledby="contest-standings">
+          <SectionTitle
+            id="contest-standings"
+            aside={board && `${board.total_participants} participant${board.total_participants === 1 ? "" : "s"}`}
+          >
+            Standings
+          </SectionTitle>
 
           {!board || board.entries.length === 0 ? (
             <Card solid>
@@ -263,12 +266,13 @@ export function ContestDetail() {
               />
             </Card>
           ) : (
-            <Card solid className="overflow-hidden">
+            <div className="panel overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
+                  <caption className="sr-only">Contest standings</caption>
                   <thead>
-                    <tr className="border-b border-white/8 text-left">
-                      <Th className="w-14">#</Th>
+                    <tr className="border-b border-line bg-surface-2/50 text-left">
+                      <Th className="w-12">#</Th>
                       <Th>User</Th>
                       <Th className="text-right">Solved</Th>
                       <Th className="text-right">Score</Th>
@@ -281,20 +285,19 @@ export function ContestDetail() {
                       return (
                         <tr
                           key={entry.user_id}
+                          aria-current={isMe ? "true" : undefined}
                           className={[
-                            "border-b border-white/5 last:border-0",
-                            isMe ? "bg-violet-400/8" : "",
+                            "border-b border-line last:border-0",
+                            isMe ? "bg-ember/10 shadow-[inset_3px_0_0_var(--ember)]" : "",
                           ].join(" ")}
                         >
-                          <td className="px-4 py-3">
+                          <td className="px-2.5 py-3 sm:px-4">
                             <RankBadge rank={entry.rank} />
                           </td>
-                          <td className="px-4 py-3">
-                            <span className="font-medium text-violet-50">
-                              {entry.username}
-                            </span>
+                          <td className="px-2.5 py-3 sm:px-4">
+                            <span className="font-medium text-ink">{entry.username}</span>
                             {isMe && (
-                              <span className="ml-2 text-[10px] font-semibold tracking-wider text-violet-300/70 uppercase">
+                              <span className="ml-2 text-[10px] font-semibold tracking-wider text-ember-2 uppercase">
                                 you
                               </span>
                             )}
@@ -311,10 +314,10 @@ export function ContestDetail() {
                                     className={[
                                       "grid size-5 place-items-center rounded font-mono text-[10px] font-bold",
                                       cell.solved
-                                        ? "bg-emerald-400/20 text-emerald-300"
+                                        ? "bg-pass/15 text-pass"
                                         : cell.attempts > 0
-                                          ? "bg-rose-400/15 text-rose-300"
-                                          : "bg-white/6 text-violet-200/35",
+                                          ? "bg-fail/12 text-fail"
+                                          : "bg-surface-2 text-ink-3",
                                     ].join(" ")}
                                   >
                                     {cell.label ?? "?"}
@@ -323,27 +326,22 @@ export function ContestDetail() {
                               </div>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-right font-mono tabular-nums text-violet-100">
-                            {entry.solved}
-                          </td>
-                          <td className="px-4 py-3 text-right font-mono font-bold tabular-nums text-violet-50">
+                          <td className="px-2.5 py-3 sm:px-4 text-right font-mono text-ink-2 tabular-nums">{entry.solved}</td>
+                          <td className="px-2.5 py-3 sm:px-4 text-right font-mono font-bold text-ink tabular-nums">
                             {entry.score}
                           </td>
-                          <td className="px-4 py-3 text-right font-mono tabular-nums text-violet-200/55">
-                            {entry.penalty}
-                          </td>
+                          <td className="px-2.5 py-3 sm:px-4 text-right font-mono text-ink-3 tabular-nums">{entry.penalty}</td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
-              <p className="border-t border-white/8 px-4 py-3 text-xs text-violet-200/40">
-                Ranked by score, then by penalty. Penalty counts minutes to each
-                solve plus {contest.penalty_minutes_per_wrong} per rejected
-                attempt on problems eventually solved.
+              <p className="border-t border-line px-4 py-3 text-xs text-ink-3">
+                Ranked by score, then by penalty. Penalty counts minutes to each solve plus{" "}
+                {contest.penalty_minutes_per_wrong} per rejected attempt on problems eventually solved.
               </p>
-            </Card>
+            </div>
           )}
         </section>
       </div>
@@ -351,35 +349,41 @@ export function ContestDetail() {
   );
 }
 
-function Th({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
+function SectionTitle({ id, children, aside }: { id: string; children: ReactNode; aside?: ReactNode }) {
+  return (
+    <div className="mb-4 flex items-baseline justify-between gap-3">
+      <h2 id={id} className="text-lg font-semibold text-ink">
+        {children}
+      </h2>
+      {aside && <span className="font-mono text-xs text-ink-3">{aside}</span>}
+    </div>
+  );
+}
+
+function Th({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <th
-      className={`px-4 py-3 text-xs font-semibold tracking-wide text-violet-300/60 uppercase ${className}`}
+      scope="col"
+      className={`px-2.5 py-3 font-mono text-[11px] font-medium tracking-[0.1em] sm:px-4 text-ink-3 uppercase ${className}`}
     >
       {children}
     </th>
   );
 }
 
-function RankBadge({ rank }: { rank: number }) {
-  const medal =
-    rank === 1
-      ? "border-amber-400/40 bg-amber-400/15 text-amber-300"
-      : rank === 2
-        ? "border-slate-300/35 bg-slate-300/12 text-slate-200"
-        : rank === 3
-          ? "border-orange-400/35 bg-orange-400/12 text-orange-300"
-          : "border-white/10 bg-white/5 text-violet-200/60";
+const MEDALS: Record<number, string> = {
+  1: "border-ember/50 bg-ember/15 text-ember-2",
+  2: "border-frost/45 bg-frost/12 text-frost",
+  3: "border-warn/45 bg-warn/12 text-warn",
+};
 
+function RankBadge({ rank }: { rank: number }) {
   return (
     <span
-      className={`grid size-7 place-items-center rounded-lg border font-mono text-xs font-bold ${medal}`}
+      className={[
+        "grid size-7 place-items-center rounded-lg border font-mono text-xs font-bold",
+        MEDALS[rank] ?? "border-line bg-surface-2 text-ink-2",
+      ].join(" ")}
     >
       {rank}
     </span>

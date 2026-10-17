@@ -5,15 +5,16 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
-    // CodeMirror and its language modes are the bulk of the bundle and are
-    // only needed on the problem page, so they are split out of the entry
-    // chunk. The landing page then loads in a fraction of the payload.
+    // CodeMirror, KaTeX and three.js are reached only through lazy imports
+    // (the Solve page, the maths renderer, the landing scene), so Vite splits
+    // them out of the entry chunk by itself. A manual "editor" chunk used to
+    // be named here; it made index.html preload the whole editor on every
+    // page, so only the router keeps a chunk of its own.
     rollupOptions: {
       output: {
         // Function form: the object form is not accepted by Vite's typings
         // when `output` may also be an array.
         manualChunks(id: string) {
-          if (id.includes("codemirror") || id.includes("@lezer")) return "editor";
           if (id.includes("react-router")) return "router";
           return undefined;
         },

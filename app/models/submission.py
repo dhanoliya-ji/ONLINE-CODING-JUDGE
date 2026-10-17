@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -37,6 +37,9 @@ class Submission(TimestampMixin, Base):
     contest_id: Mapped[int | None] = mapped_column(
         ForeignKey("contests.id", ondelete="SET NULL"), index=True, nullable=True
     )
+    #: Made during a virtual replay of a finished contest: counts on the
+    #: replay's own standings, never on the real ones.
+    is_virtual: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
 
     language: Mapped[str] = mapped_column(String(20), nullable=False)
     source_code: Mapped[str] = mapped_column(Text, nullable=False)

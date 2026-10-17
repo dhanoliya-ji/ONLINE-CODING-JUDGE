@@ -1,0 +1,109 @@
+/* Landing-only styles: the CSS crucible (fallback for the WebGL scene) and
+   pointer parallax for the floating cards. Colours come from the theme
+   variables so both themes work. */
+
+.forge-css {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.6s ease;
+}
+
+/* Flat stage with perspective for the rings. A preserve-3d tilt here made
+   Chromium clip the core's glow into a hard-edged box. */
+.forge-css-stage {
+  position: absolute;
+  inset: 0;
+  perspective: 1100px;
+}
+
+.forge-css-core,
+.forge-css-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  translate: -50% -50%;
+}
+
+.forge-css-core {
+  width: 170px;
+  height: 170px;
+  background: radial-gradient(
+    circle at 40% 35%,
+    color-mix(in srgb, var(--ember-2) 55%, white) 0%,
+    var(--ember-2) 28%,
+    var(--ember) 58%,
+    transparent 72%
+  );
+  box-shadow: 0 0 120px 40px var(--glow);
+  animation: forge-pulse 4s ease-in-out infinite;
+}
+
+.forge-css-ring.a {
+  width: 380px;
+  height: 380px;
+  border: 2px solid color-mix(in srgb, var(--ember) 75%, transparent);
+  box-shadow:
+    0 0 30px color-mix(in srgb, var(--ember) 35%, transparent),
+    inset 0 0 30px color-mix(in srgb, var(--ember) 20%, transparent);
+  animation: forge-spin-a 18s linear infinite;
+}
+
+.forge-css-ring.b {
+  width: 300px;
+  height: 300px;
+  border: 1.5px dashed color-mix(in srgb, var(--frost) 70%, transparent);
+  animation: forge-spin-b 26s linear infinite;
+}
+
+.forge-css-ring.c {
+  width: 460px;
+  height: 460px;
+  border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  animation: forge-spin-c 34s linear infinite;
+}
+
+@media (max-width: 640px) {
+  .forge-css-stage {
+    scale: 0.72;
+  }
+}
+
+@keyframes forge-spin-a {
+  from { transform: rotateX(72deg) rotateZ(0deg); }
+  to { transform: rotateX(72deg) rotateZ(360deg); }
+}
+
+@keyframes forge-spin-b {
+  from { transform: rotateX(64deg) rotateY(18deg) rotateZ(360deg); }
+  to { transform: rotateX(64deg) rotateY(18deg) rotateZ(0deg); }
+}
+
+@keyframes forge-spin-c {
+  from { transform: rotateX(80deg) rotateY(-14deg) rotateZ(0deg); }
+  to { transform: rotateX(80deg) rotateY(-14deg) rotateZ(360deg); }
+}
+
+@keyframes forge-pulse {
+  0%, 100% { opacity: 0.85; scale: 1; }
+  50% { opacity: 1; scale: 1.06; }
+}
+
+/* Floating cards drift against the pointer; --px/--py are set from JS in
+   [-1, 1] and --depth says how far each card moves. `transform` is used so
+   it composes with the float-* animations, which animate `translate`. */
+.parallax {
+  transform: translate3d(calc(var(--px, 0) * var(--depth, 12px)), calc(var(--py, 0) * var(--depth, 12px)), 0)
+    rotateY(var(--turn, 0deg));
+  transition: transform 0.25s ease-out;
+}
+
+/* The topic marquee stops while someone is reading it. */
+.marquee-track:hover .marquee {
+  animation-play-state: paused;
+}
+
+/* Fade the marquee edges into the page instead of cutting the chips off. */
+.marquee-track {
+  mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
+}

@@ -18,6 +18,7 @@ from app.models.problem import Problem
 from app.models.test_case import TestCase
 from app.models.user import User
 from app.schemas.common import Message
+from app.services.access import can_view_problem
 from app.schemas.test_case import (
     TestCaseBulkCreate,
     TestCaseCreate,
@@ -39,7 +40,10 @@ def list_test_cases(
     db: Session = Depends(get_db),
     viewer: User | None = Depends(get_optional_user),
 ) -> list[TestCasePublic]:
-    _require_problem(db, problem_id)
+    problem = _require_problem(db, problem_id)
+    if not can_view_problem(db, problem, viewer):
+        # Samples of a problem sealed for an upcoming contest stay sealed.
+        raise _not_found()
     is_admin = bool(viewer and viewer.is_admin)
 
     test_cases = list(

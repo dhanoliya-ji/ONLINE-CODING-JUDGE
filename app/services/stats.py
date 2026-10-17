@@ -6,23 +6,34 @@ submissions into Python, so the cost stays flat as a user's history grows.
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 from sqlalchemy import case, distinct, func, select
 from sqlalchemy.orm import Session
 
+from app.models.base import utcnow
+from app.models.community import RatingChange
+from app.models.contest import Contest
 from app.models.contest_registration import ContestRegistration
 from app.models.enums import Verdict
 from app.models.problem import Problem
 from app.models.submission import Submission
+from app.models.tag import Tag, problem_tags
 from app.models.user import User
 from app.schemas.dashboard import (
     DashboardResponse,
+    DayActivity,
     DifficultyProgress,
+    Badge,
     LanguageUsage,
+    RatingPoint,
+    TagProgress,
     VerdictCount,
 )
-from app.schemas.submission import SubmissionSummary
+from app.schemas.submission import SubmissionSummary, with_problem_titles
 
 RECENT_LIMIT = 10
+TOP_TAGS = 12
 
 
 def build_dashboard(db: Session, user: User) -> DashboardResponse:
@@ -137,5 +148,129 @@ def build_dashboard(db: Session, user: User) -> DashboardResponse:
             )
             for language, count, accepted_count in language_rows
         ],
-        recent_submissions=[SubmissionSummary.model_validate(s) for s in recent],
+        recent_submissions=with_problem_titles(db, [SubmissionSummary.model_validate(s) for s in recent]),
+        **_activity(db, user),
+        tag_progress=_tag_progress(db, user),
+        global_rank=_global_rank(db, problems_solved),
+        rating=user.rating,
+        max_rating=user.max_rating,
+        rating_history=_rating_history(db, user),
+        badges=_badges(db, user, problems_solved, contests_participated,
+                       {lang for lang, *_ in language_rows}, solved_by_difficulty),
+        member_since=user.created_at.date().isoformat() if user.created_at else None,
     )
+
+
+def _rating_history(db: Session, user: User) -> list[RatingPoint]:
+    rows = db.execute(
+        select(RatingChange, Contest.title, Contest.end_time)
+        .join(Contest, Contest.id == RatingChange.contest_id)
+        .where(RatingChange.user_id == user.id)
+        .order_by(Contest.end_time)
+    ).all()
+    return [
+        RatingPoint(contest_id=change.contest_id, contest_title=title, date=end.date().isoformat(),
+                    rank=change.rank, old_rating=change.old_rating, new_rating=change.new_rating)
+        for change, title, end in rows
+    ]
+
+
+def _badges(db: Session, user: User, solved: int, contests: int, languages: set[str],
+            by_difficulty: dict) -> list[Badge]:
+    """Milestones, computed from what is already recorded: nothing to store."""
+    streak = _activity(db, user)["longest_streak"]
+    hard = int(by_difficulty.get("Hard", 0))
+
+    def badge(id_: str, name: str, description: str, have: float, need: float) -> Badge:
+        return Badge(id=id_, name=name, description=description, earned=have >= need,
+                     progress=round(min(1.0, have / need), 3))
+
+    return [
+        badge("first-ac", "First blood", "Get your first Accepted", solved, 1),
+        badge("solved-10", "Warming up", "Solve 10 problems", solved, 10),
+        badge("solved-50", "Forged", "Solve 50 problems", solved, 50),
+        badge("solved-250", "Tempered steel", "Solve 250 problems", solved, 250),
+        badge("solved-1000", "Master smith", "Solve 1000 problems", solved, 1000),
+        badge("hard-10", "Hard boiled", "Solve 10 Hard problems", hard, 10),
+        badge("streak-7", "On a roll", "Practise 7 days in a row", streak, 7),
+        badge("streak-30", "Unbreakable", "Practise 30 days in a row", streak, 30),
+        badge("polyglot", "Polyglot", "Submit in 5 different languages", len(languages), 5),
+        badge("contestant", "Into the arena", "Join a contest", contests, 1),
+        badge("rated", "On the ladder", "Earn a contest rating", 1 if user.rating else 0, 1),
+    ]
+
+
+def _global_rank(db: Session, solved: int) -> int | None:
+    """1 + the number of users who have solved more problems."""
+    if solved == 0:
+        return None
+    per_user = (
+        select(Submission.user_id, func.count(distinct(Submission.problem_id)).label("solved"))
+        .where(Submission.verdict == Verdict.ACCEPTED.value)
+        .group_by(Submission.user_id)
+        .subquery()
+    )
+    ahead = db.scalar(select(func.count()).select_from(per_user).where(per_user.c.solved > solved))
+    return int(ahead or 0) + 1
+
+
+def _activity(db: Session, user: User) -> dict:
+    """Per-day counts for the heatmap, and the streaks they imply."""
+    today = utcnow().date()
+    day = func.date(Submission.created_at)
+    rows = db.execute(
+        select(
+            day,
+            func.count(Submission.id),
+            func.sum(case((Submission.verdict == Verdict.ACCEPTED.value, 1), else_=0)),
+        )
+        .where(Submission.user_id == user.id,
+               Submission.created_at >= today - timedelta(days=365))
+        .group_by(day)
+        .order_by(day)
+    ).all()
+    activity = [
+        DayActivity(date=str(when)[:10], submissions=int(count), accepted=int(ok or 0))
+        for when, count, ok in rows
+    ]
+
+    days = sorted({date.fromisoformat(a.date) for a in activity})
+    longest = run = 0
+    previous = None
+    for current in days:
+        run = run + 1 if previous and current - previous == timedelta(days=1) else 1
+        longest = max(longest, run)
+        previous = current
+    # A streak is still alive if the last active day is today or yesterday.
+    current_streak = run if days and today - days[-1] <= timedelta(days=1) else 0
+    return {"activity": activity, "current_streak": current_streak, "longest_streak": longest}
+
+
+def _tag_progress(db: Session, user: User) -> list[TagProgress]:
+    """Solved vs. available for the most common topics."""
+    totals = db.execute(
+        select(Tag.id, Tag.slug, Tag.name, func.count(problem_tags.c.problem_id))
+        .join(problem_tags, problem_tags.c.tag_id == Tag.id)
+        .join(Problem, Problem.id == problem_tags.c.problem_id)
+        .where(Problem.is_public.is_(True))
+        .group_by(Tag.id, Tag.slug, Tag.name)
+        .order_by(func.count(problem_tags.c.problem_id).desc())
+        .limit(TOP_TAGS)
+    ).all()
+    if not totals:
+        return []
+    solved_problems = select(Submission.problem_id).where(
+        Submission.user_id == user.id, Submission.verdict == Verdict.ACCEPTED.value
+    )
+    solved = dict(
+        db.execute(
+            select(problem_tags.c.tag_id, func.count(distinct(problem_tags.c.problem_id)))
+            .where(problem_tags.c.tag_id.in_([t[0] for t in totals]),
+                   problem_tags.c.problem_id.in_(solved_problems))
+            .group_by(problem_tags.c.tag_id)
+        ).all()
+    )
+    return [
+        TagProgress(slug=slug, name=name, solved=int(solved.get(tag_id, 0)), total=int(total))
+        for tag_id, slug, name, total in totals
+    ]

@@ -1,327 +1,273 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { useAuth } from "../lib/auth";
-import type { Health } from "../lib/types";
-import { Badge, Card } from "../components/ui";
+import type { Contest, Facets, ProblemSummary } from "../lib/types";
+import { HeroVisual } from "../components/landing/HeroVisual";
+
+const LANGUAGES = ["Python", "C++", "Java", "C", "JavaScript", "TypeScript", "Go", "Rust", "Ruby", "PHP"];
+
+// Shown until the facets arrive, or if they never do.
+const FALLBACK_TOPICS = [
+  "Math",
+  "Implementation",
+  "Greedy",
+  "Dynamic Programming",
+  "Sorting",
+  "Data Structures",
+  "Strings",
+  "Number Theory",
+  "Binary Search",
+  "Graphs",
+  "Constructive",
+  "Combinatorics",
+  "Two Pointers",
+  "Bit Manipulation",
+  "Geometry",
+  "Trees",
+  "Hashing",
+  "Shortest Paths",
+];
+
+const STEPS = [
+  { n: "01", title: "Write", body: "Ten languages in a full editor, with your own custom input to try before you submit." },
+  { n: "02", title: "Sandbox", body: "Compiled and run in isolation: no network, hard memory and time limits, a capped process count." },
+  { n: "03", title: "Judge", body: "Samples run first, then the hidden tests, one by one. Hidden data never leaves the server." },
+  { n: "04", title: "Verdict", body: "Accepted, wrong answer, time or memory limit, runtime or compile error, with real timings." },
+];
 
 const FEATURES = [
   {
-    icon: "◈",
-    title: "Container-isolated execution",
-    body: "Every submission runs in a throw-away sandbox: network disabled, hard memory ceiling, CPU quota, process cap, read-only root filesystem and every Linux capability dropped.",
+    mark: "#",
+    title: "Tags & filters",
+    body: "Filter by topic, difficulty, source, rating and status. Full-text search across every statement.",
   },
   {
-    icon: "◉",
-    title: "Seven distinct verdicts",
-    body: "Accepted, Wrong Answer, Time Limit Exceeded, Memory Limit Exceeded, Runtime Error, Compilation Error and Output Limit Exceeded — each from a real signal, not a guess.",
+    mark: "◎",
+    title: "Daily & random",
+    body: "One shared problem of the day, or roll a random pick at your level from the topics you choose.",
   },
   {
-    icon: "◐",
-    title: "Sample and hidden suites",
-    body: "Samples run first so a wrong solution fails in one execution. Hidden test data never leaves the server — only its index and timings ever reach a response.",
+    mark: "?",
+    title: "AI practice coach",
+    body: "Stuck? Ask for a hint and get a nudge, not the answer. The coach switches off during live contests.",
   },
   {
-    icon: "◆",
-    title: "Contests with ICPC scoring",
-    body: "Points awarded once per problem on first solve, with time-plus-attempt penalties. Practice submissions can never move a contest ranking.",
+    mark: "★",
+    title: "Contests & leaderboard",
+    body: "Timed rounds with ICPC scoring and wrong-attempt penalties, plus a global leaderboard.",
   },
   {
-    icon: "◍",
-    title: "Real measurements",
-    body: "Execution time and peak memory are sampled from the sandbox itself, not hard-coded. Numbers you can sort and compare.",
+    mark: "▦",
+    title: "Your progress",
+    body: "A profile with an activity heatmap, streaks, solved-by-difficulty and your recent verdicts.",
   },
   {
-    icon: "◇",
-    title: "Analytics that add up",
-    body: "Acceptance rate, distinct problems solved, verdict distribution and per-language breakdowns — all computed with grouped SQL aggregates.",
+    mark: "⌘",
+    title: "Ten languages, no friction",
+    body: "Python to Rust in one editor. Jump anywhere with the Ctrl K command palette, in a dark or light theme.",
   },
 ];
 
-const SAMPLE_CODE = `a, b = map(int, input().split())
-print(a + b)`;
-
 export function Landing() {
-  const { user } = useAuth();
-  const [health, setHealth] = useState<Health | null>(null);
-  const [problemCount, setProblemCount] = useState<number | null>(null);
+  const [facets, setFacets] = useState<Facets | null>(null);
+  const [facetsFailed, setFacetsFailed] = useState(false);
+  const [daily, setDaily] = useState<ProblemSummary | null>(null);
+  const [contest, setContest] = useState<Contest | null>(null);
 
   useEffect(() => {
-    api.health().then(setHealth).catch(() => {});
+    let live = true;
     api
-      .problems({ limit: 1 })
-      .then((page) => setProblemCount(page.total))
+      .facets()
+      .then((f) => live && setFacets(f))
+      .catch(() => live && setFacetsFailed(true));
+    api
+      .dailyProblem()
+      .then((p) => live && setDaily(p))
       .catch(() => {});
+    api
+      .contests({ limit: 10 })
+      .then((page) => {
+        // Prefer a round that is running now, then the next one to start.
+        const pick =
+          page.items.find((c) => c.state === "Running") ?? page.items.find((c) => c.state === "Upcoming") ?? null;
+        if (live) setContest(pick);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
   }, []);
 
+  const problemCount = facets ? Object.values(facets.difficulties).reduce((sum, n) => sum + n, 0) : null;
+  const sourceNames = facets && Object.keys(facets.sources).length ? Object.keys(facets.sources) : ["Codeforces", "AtCoder", "CodeChef"];
+  const sources = new Intl.ListFormat("en", { type: "conjunction" }).format(sourceNames);
+  const topics = facets?.tags.length ? facets.tags.map((t) => t.name) : FALLBACK_TOPICS;
+
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6">
-      {/* ---------------------------------------------------------- Hero */}
-      <section className="py-20 sm:py-28">
-        <div className="mx-auto max-w-3xl text-center">
-          <div className="animate-rise mb-6 flex justify-center">
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-3.5 py-1.5 text-xs font-medium text-violet-200/80 backdrop-blur-xl">
-              <span
-                className="size-1.5 rounded-full bg-emerald-400 animate-pulse-ring"
-                aria-hidden="true"
-              />
-              {health
-                ? `Judge online · ${health.execution.active} sandbox`
-                : "Connecting to the judge…"}
+    <div className="overflow-x-clip">
+      {/* ------------------------------------------------------------ Hero */}
+      <section className="mx-auto flex max-w-[1240px] flex-col items-center gap-6 px-4 pt-10 pb-12 sm:px-8 sm:pt-14 lg:flex-row lg:gap-10 lg:pb-20">
+        <div className="w-full min-w-0 lg:flex-[1_1_52%]">
+          <p className="animate-rise mb-6 inline-flex max-w-full items-start gap-2.5 rounded-2xl border border-line-strong bg-surface/60 px-3.5 py-1.5 font-mono text-[12px] leading-relaxed text-ink-2 backdrop-blur xl:rounded-full">
+            <span className="mt-[6px] size-2 shrink-0 rounded-full bg-pass" aria-hidden="true" />
+            <span className="sr-only">Judged in a sandbox in ten languages: </span>
+            <span className="flex flex-wrap gap-x-1.5 gap-y-0.5">
+              {LANGUAGES.map((lang, i) => (
+                <span key={lang} className="whitespace-nowrap">
+                  {i > 0 && (
+                    <span className="mr-1.5 text-ink-3" aria-hidden="true">
+                      ·
+                    </span>
+                  )}
+                  {lang}
+                </span>
+              ))}
             </span>
-          </div>
+          </p>
 
           <h1
-            className="animate-rise text-5xl font-black tracking-tight text-balance sm:text-7xl"
+            className="animate-rise font-display text-[clamp(2.4rem,6vw,4.75rem)] leading-[1.04] font-extrabold tracking-[-0.02em] text-balance text-ink"
             style={{ animationDelay: "60ms" }}
           >
-            <span className="gradient-text">Write code.</span>
-            <br />
-            <span className="text-violet-50">Get judged.</span>
+            Forge your skills under <span className="bg-gradient-to-br from-ember-2 to-ember bg-clip-text text-transparent">real</span> judging.
           </h1>
 
           <p
-            className="animate-rise mx-auto mt-6 max-w-xl text-lg text-pretty text-violet-200/65"
+            className="animate-rise mt-6 max-w-[34rem] text-[17px] leading-relaxed text-pretty text-ink-2 sm:text-[19px]"
             style={{ animationDelay: "120ms" }}
           >
-            A competitive-programming judge that compiles and runs untrusted
-            code in a locked-down sandbox, then grades it against sample and
-            hidden test suites — in one request.
+            {problemCount ? `${problemCount} problems` : "Hundreds of problems"} from {sources}{" "}
+            across every core topic. Filter by tag and difficulty, and get a verdict on hidden tests in the same request.
           </p>
 
-          <div
-            className="animate-rise mt-9 flex flex-wrap items-center justify-center gap-3"
-            style={{ animationDelay: "180ms" }}
-          >
-            <Link
-              to={user ? "/problems" : "/register"}
-              className="btn-primary rounded-xl px-6 py-3 text-sm font-semibold text-white"
-            >
-              {user ? "Solve a problem" : "Start solving — free"}
+          <div className="animate-rise mt-8 flex flex-wrap gap-3" style={{ animationDelay: "180ms" }}>
+            <Link to="/problems" className="btn-primary rounded-2xl px-6 py-3.5 text-[16px] font-semibold sm:text-[17px]">
+              Start solving — it's free
             </Link>
             <Link
-              to="/problems"
-              className="btn-ghost rounded-xl px-6 py-3 text-sm font-semibold text-violet-100"
+              to={daily ? `/problems/${daily.slug}` : "/contests"}
+              className="btn-ghost rounded-2xl px-5 py-3.5 text-[16px] font-medium sm:text-[17px]"
             >
-              Browse problems →
+              {daily ? "Try today's problem" : "Browse contests"}
             </Link>
           </div>
 
-          {!user && (
-            <p
-              className="animate-rise mt-5 text-xs text-violet-200/45"
-              style={{ animationDelay: "220ms" }}
-            >
-              Or try the demo account —{" "}
-              <code className="rounded bg-white/8 px-1.5 py-0.5 font-mono text-violet-200/80">
-                demo@example.com
-              </code>{" "}
-              /{" "}
-              <code className="rounded bg-white/8 px-1.5 py-0.5 font-mono text-violet-200/80">
-                DemoPass123
-              </code>
-            </p>
-          )}
+          <dl className="animate-rise mt-10 flex flex-wrap gap-x-10 gap-y-5" style={{ animationDelay: "240ms" }} aria-live="polite">
+            <HeroStat label="problems" value={problemCount} failed={facetsFailed} />
+            <HeroStat label="topics" value={facets ? facets.tags.length : null} failed={facetsFailed} />
+            <HeroStat label="languages" value={LANGUAGES.length} />
+          </dl>
         </div>
 
-        {/* Editor mock — shows the product before asking for a signup. */}
-        <div
-          className="animate-rise mx-auto mt-16 max-w-4xl"
-          style={{ animationDelay: "260ms" }}
-        >
-          <Card solid edge className="overflow-hidden">
-            <div className="flex items-center gap-2 border-b border-white/8 px-4 py-3">
-              <span className="size-3 rounded-full bg-rose-400/70" />
-              <span className="size-3 rounded-full bg-amber-400/70" />
-              <span className="size-3 rounded-full bg-emerald-400/70" />
-              <span className="ml-3 font-mono text-xs text-violet-200/50">
-                solution.py — Sum of Two Numbers
-              </span>
-            </div>
-
-            <div className="grid gap-0 md:grid-cols-[1.4fr_1fr]">
-              <pre className="overflow-x-auto px-5 py-5 font-mono text-[13px] leading-relaxed text-violet-100/90">
-                <code>
-                  <span className="text-violet-200/30">1  </span>
-                  <span className="text-sky-300">a</span>,{" "}
-                  <span className="text-sky-300">b</span> ={" "}
-                  <span className="text-fuchsia-300">map</span>(
-                  <span className="text-emerald-300">int</span>,{" "}
-                  <span className="text-fuchsia-300">input</span>().
-                  <span className="text-fuchsia-300">split</span>()){"\n"}
-                  <span className="text-violet-200/30">2  </span>
-                  <span className="text-fuchsia-300">print</span>(a + b)
-                </code>
-              </pre>
-
-              <div className="border-t border-white/8 p-5 md:border-t-0 md:border-l">
-                <div className="mb-4 flex items-center gap-2">
-                  <Badge tone="pass">✓ Accepted</Badge>
-                </div>
-                <dl className="space-y-2.5 font-mono text-sm">
-                  {[
-                    ["Tests", "6 / 6"],
-                    ["Time", "63.1 ms"],
-                    ["Memory", "9.0 MB"],
-                    ["Score", "100"],
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex justify-between">
-                      <dt className="text-violet-200/50">{label}</dt>
-                      <dd className="tabular-nums text-violet-50">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            </div>
-          </Card>
+        <div className="w-full min-w-0 lg:flex-[1_1_48%]">
+          <HeroVisual />
         </div>
       </section>
 
-      {/* --------------------------------------------------------- Stats */}
-      <section className="grid grid-cols-2 gap-4 pb-20 lg:grid-cols-4">
-        {[
-          { label: "Problems", value: problemCount ?? "—" },
-          { label: "Languages", value: health?.languages.length ?? 3 },
-          { label: "Verdicts", value: 7 },
-          {
-            label: "Database",
-            value: health?.database.connected ? "Online" : "—",
-          },
-        ].map((stat, index) => (
-          <Card
-            key={stat.label}
-            hover
-            edge
-            className="animate-rise p-5 text-center"
-            {...{ style: { animationDelay: `${index * 60}ms` } }}
-          >
-            <p className="font-mono text-3xl font-bold tabular-nums text-violet-50">
-              {stat.value}
-            </p>
-            <p className="mt-1 text-[11px] font-semibold tracking-[0.14em] text-violet-300/60 uppercase">
-              {stat.label}
-            </p>
-          </Card>
-        ))}
-      </section>
-
-      {/* ------------------------------------------------------ Features */}
-      <section className="pb-24">
-        <div className="mb-12 text-center">
-          <p className="mb-3 text-xs font-semibold tracking-[0.2em] text-violet-300/70 uppercase">
-            How it works
-          </p>
-          <h2 className="text-3xl font-bold tracking-tight text-violet-50 sm:text-4xl">
-            Running a stranger&rsquo;s code, safely
-          </h2>
-          <p className="mx-auto mt-3 max-w-2xl text-pretty text-violet-200/60">
-            Everything here follows from one problem: execute code you
-            don&rsquo;t trust, on your server, and return a verdict you can
-            rely on.
-          </p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((feature, index) => (
-            <Card
-              key={feature.title}
-              hover
-              edge
-              className="animate-rise p-6"
-              {...{ style: { animationDelay: `${index * 50}ms` } }}
-            >
-              <div
-                className="mb-4 grid size-11 place-items-center rounded-xl border border-white/12 bg-gradient-to-br from-violet-500/25 to-fuchsia-500/15 text-lg text-violet-200"
-                aria-hidden="true"
-              >
-                {feature.icon}
-              </div>
-              <h3 className="mb-2 text-base font-semibold text-violet-50">
-                {feature.title}
-              </h3>
-              <p className="text-sm leading-relaxed text-violet-200/60">
-                {feature.body}
-              </p>
-            </Card>
+      {/* ---------------------------------------------------- Topic marquee */}
+      <section aria-label="Topics" className="marquee-track overflow-hidden border-y border-line bg-bg-raised/40 py-4">
+        <ul className="sr-only">
+          {topics.map((name) => (
+            <li key={name}>{name}</li>
+          ))}
+        </ul>
+        {/* Two copies back to back, so the -50% loop is seamless. */}
+        <div className="marquee flex w-max gap-3" aria-hidden="true">
+          {[...topics, ...topics].map((name, i) => (
+            <span key={`${name}-${i}`} className="rounded-full border border-line-strong px-4 py-2 text-sm whitespace-nowrap text-ink-2">
+              {name}
+            </span>
           ))}
         </div>
       </section>
 
-      {/* ----------------------------------------------------- Honesty */}
-      {health && (
-        <section className="pb-24">
-          <Card solid className="p-6 sm:p-8">
-            <div className="flex flex-wrap items-start justify-between gap-6">
-              <div className="max-w-xl">
-                <h3 className="mb-2 text-lg font-semibold text-violet-50">
-                  What this instance is actually running
-                </h3>
-                <p className="text-sm leading-relaxed text-violet-200/60">
-                  Free hosting exposes no Docker socket, so this deployment
-                  uses the resource-limited subprocess sandbox rather than
-                  containers. The endpoint below always reports the truth — the
-                  judge never claims isolation it is not providing.
-                </p>
-              </div>
-
-              <dl className="grid shrink-0 grid-cols-2 gap-x-8 gap-y-3 font-mono text-sm">
-                <dt className="text-violet-200/50">Sandbox</dt>
-                <dd className="text-violet-50">{health.execution.active}</dd>
-                <dt className="text-violet-200/50">Database</dt>
-                <dd className="text-violet-50">
-                  {health.database.dialect ?? "—"}
-                </dd>
-                <dt className="text-violet-200/50">Environment</dt>
-                <dd className="text-violet-50">{health.environment}</dd>
-                {health.execution.toolchains && (
-                  <>
-                    <dt className="text-violet-200/50">Toolchains</dt>
-                    <dd className="flex flex-wrap gap-1.5">
-                      {Object.entries(health.execution.toolchains).map(
-                        ([lang, ok]) => (
-                          <Badge key={lang} tone={ok ? "pass" : "muted"}>
-                            {ok ? "✓" : "✕"} {lang}
-                          </Badge>
-                        ),
-                      )}
-                    </dd>
-                  </>
-                )}
-              </dl>
-            </div>
-          </Card>
-        </section>
-      )}
-
-      {/* ------------------------------------------------------------ CTA */}
-      <section className="pb-24">
-        <Card edge className="overflow-hidden p-10 text-center sm:p-14">
-          <h2 className="text-3xl font-bold tracking-tight text-violet-50 sm:text-4xl">
-            Ready to solve something?
-          </h2>
-          <p className="mx-auto mt-3 max-w-md text-pretty text-violet-200/60">
-            Six problems from Easy to Hard, a live contest, and instant
-            verdicts. No setup.
-          </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Link
-              to={user ? "/problems" : "/register"}
-              className="btn-primary rounded-xl px-6 py-3 text-sm font-semibold text-white"
+      {/* ------------------------------------------------------- Pipeline */}
+      <section className="mx-auto max-w-[1240px] px-4 pt-20 pb-10 sm:px-8 sm:pt-24">
+        <p className="font-mono text-[13px] tracking-[0.08em] text-ember [[data-theme=light]_&]:text-ember-2">HOW A SUBMISSION TRAVELS</p>
+        <h2 className="mt-3 mb-10 font-display text-[clamp(1.75rem,3.4vw,2.75rem)] leading-tight font-bold tracking-[-0.01em] text-balance text-ink">
+          From keystroke to verdict in one request.
+        </h2>
+        <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {STEPS.map((step) => (
+            <li
+              key={step.n}
+              className="tilt flex min-h-[190px] flex-col gap-3 rounded-[20px] border border-line bg-gradient-to-b from-surface to-bg-raised p-6"
             >
-              {user ? "Go to problems" : "Create an account"}
-            </Link>
-            <Link
-              to="/contests"
-              className="btn-ghost rounded-xl px-6 py-3 text-sm font-semibold text-violet-100"
-            >
-              See the contest
-            </Link>
-          </div>
-          <pre className="mx-auto mt-10 w-fit rounded-xl border border-white/10 bg-black/30 px-5 py-3 text-left font-mono text-xs text-violet-200/70">
-            {SAMPLE_CODE}
-          </pre>
-        </Card>
+              <span className="font-mono text-[13px] text-frost">{step.n}</span>
+              <span className="font-display text-[21px] font-bold text-ink">{step.title}</span>
+              <span className="text-[15px] leading-relaxed text-ink-2">{step.body}</span>
+            </li>
+          ))}
+        </ol>
       </section>
+
+      {/* ------------------------------------------------------- Features */}
+      <section className="mx-auto max-w-[1240px] px-4 py-16 sm:px-8 sm:py-20">
+        <h2 className="mb-9 font-display text-[clamp(1.75rem,3.4vw,2.75rem)] leading-tight font-bold tracking-[-0.01em] text-balance text-ink">
+          Everything a serious practice platform needs.
+        </h2>
+        <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map((feature) => (
+            <li key={feature.title} className="tilt panel flex min-h-[200px] flex-col gap-3.5 rounded-[22px] p-7">
+              <span
+                className="grid size-11 place-items-center rounded-xl bg-ember/12 font-mono text-lg text-ember"
+                aria-hidden="true"
+              >
+                {feature.mark}
+              </span>
+              <h3 className="font-display text-[19px] font-bold text-ink">{feature.title}</h3>
+              <p className="text-[15px] leading-relaxed text-ink-2">{feature.body}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* ---------------------------------------------------- Contest band */}
+      <section className="mx-auto max-w-[1240px] px-4 pt-6 pb-24 sm:px-8 sm:pb-28">
+        <div className="relative flex flex-wrap items-center justify-between gap-7 overflow-hidden rounded-[28px] border border-line-strong bg-surface px-6 py-10 sm:px-12 sm:py-14">
+          <div
+            className="pointer-events-none absolute -top-32 -right-20 size-[380px] rounded-full bg-[radial-gradient(circle,var(--glow),transparent_70%)]"
+            aria-hidden="true"
+          />
+          <div className="relative min-w-0 flex-[1_1_420px]">
+            {contest && (
+              <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-line-strong bg-bg-raised px-3 py-1 font-mono text-[12px] text-ink-2">
+                <span
+                  className={`size-2 rounded-full ${contest.state === "Running" ? "bg-pass" : "bg-frost"}`}
+                  aria-hidden="true"
+                />
+                {contest.state === "Running" ? "Live now" : "Up next"}: {contest.title} · {contest.problem_count} problems
+              </p>
+            )}
+            <h2 className="font-display text-[clamp(1.75rem,3.6vw,3rem)] leading-[1.06] font-extrabold text-ink">
+              Timed contests.
+              <br />
+              Standings that count.
+            </h2>
+            <p className="mt-4 max-w-[32rem] text-[17px] leading-relaxed text-ink-2">
+              ICPC-style rounds: a point for each problem on first solve, a penalty for time and wrong attempts. Practice
+              submissions never touch the standings.
+            </p>
+          </div>
+          <Link
+            to="/contests"
+            className="btn-primary relative rounded-2xl px-6 py-4 text-[16px] font-semibold sm:text-[17px]"
+          >
+            {contest?.state === "Running" ? "Join the live contest" : "See the contests"}
+          </Link>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function HeroStat({ label, value, failed = false }: { label: string; value: number | null; failed?: boolean }) {
+  return (
+    <div className="flex flex-col-reverse">
+      <dt className="font-mono text-[13px] text-ink-2">{label}</dt>
+      <dd className="font-display text-[26px] font-semibold text-ink tabular-nums">
+        {value ?? (failed ? "—" : <span className="skeleton inline-block h-7 w-14 align-middle" />)}
+      </dd>
     </div>
   );
 }

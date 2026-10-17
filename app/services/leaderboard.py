@@ -122,6 +122,7 @@ def _accumulate(
         select(Submission)
         .where(
             Submission.contest_id == contest.id,
+            Submission.is_virtual.is_(False),  # replays never move real standings
             Submission.problem_id.in_(points_by_problem.keys()),
             Submission.user_id.in_(progress.keys()),
         )
@@ -200,6 +201,37 @@ def _to_entry(
         penalty=penalty,
         problems=cells,
     )
+
+
+def virtual_entry(db: Session, contest: Contest, user: User, started_at: datetime) -> LeaderboardEntry:
+    """One virtual participant's result, scored as if the contest began at ``started_at``."""
+    start = _as_aware(started_at)
+    end = start + (_as_aware(contest.end_time) - _as_aware(contest.start_time))
+    links = list(db.scalars(
+        select(ContestProblem).where(ContestProblem.contest_id == contest.id)
+        .order_by(ContestProblem.order_index, ContestProblem.id)
+    ))
+    points = {link.problem_id: link.points for link in links}
+    labels = {link.problem_id: link.label for link in links}
+    progress = _UserProgress(user_id=user.id, username=user.username)
+    for submission in db.scalars(
+        select(Submission)
+        .where(Submission.contest_id == contest.id, Submission.user_id == user.id,
+               Submission.is_virtual.is_(True))
+        .order_by(Submission.created_at, Submission.id)
+    ):
+        created = _as_aware(submission.created_at)
+        if created < start or created > end or submission.problem_id not in points:
+            continue
+        cell = progress.per_problem.setdefault(submission.problem_id, _ProblemProgress())
+        if cell.solved_at is not None:
+            continue
+        cell.attempts += 1
+        if submission.verdict == Verdict.ACCEPTED.value:
+            cell.solved_at = created
+        else:
+            cell.wrong_before_solve += 1
+    return _to_entry(progress, points, labels, contest, start)
 
 
 def _as_aware(value: datetime) -> datetime:

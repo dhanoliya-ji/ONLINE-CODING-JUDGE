@@ -4,11 +4,18 @@ import type {
   CoachStatus,
   Contest,
   ContestProblem,
+  DiscussionPost,
+  Editorial,
+  ProblemListInfo,
+  VirtualStatus,
   Dashboard,
   Health,
   Leaderboard,
   Page,
+  Facets,
+  LeaderboardRow,
   Problem,
+  ProblemQuery,
   ProblemSummary,
   RunResult,
   Submission,
@@ -137,10 +144,13 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return payload as T;
 }
 
-const qs = (params: Record<string, unknown>) => {
+const qs = (params: object) => {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null && value !== "") {
+    if (Array.isArray(value)) {
+      // Repeated keys: ?difficulty=Easy&difficulty=Medium
+      for (const entry of value) search.append(key, String(entry));
+    } else if (value !== undefined && value !== null && value !== "") {
       search.set(key, String(value));
     }
   }
@@ -161,12 +171,13 @@ export const api = {
   me: () => request<User>("/auth/me"),
 
   // ---- problems --------------------------------------------------------
-  problems: (params: {
-    search?: string;
-    difficulty?: string;
-    limit?: number;
-    offset?: number;
-  }) => request<Page<ProblemSummary>>(`/problems${qs(params)}`),
+  problems: (params: ProblemQuery) => request<Page<ProblemSummary>>(`/problems${qs(params)}`),
+  facets: () => request<Facets>("/problems/facets"),
+  dailyProblem: () => request<ProblemSummary>("/problems/daily"),
+  randomProblem: (params: { difficulty?: string[]; tags?: string; unsolved?: boolean }) =>
+    request<ProblemSummary>(`/problems/random${qs(params)}`),
+  globalLeaderboard: (params: { limit?: number; offset?: number } = {}) =>
+    request<Page<LeaderboardRow>>(`/leaderboard${qs(params)}`),
   problem: (identifier: string | number) => request<Problem>(`/problems/${identifier}`),
   coachStatus: (identifier: string | number) =>
     request<CoachStatus>(`/problems/${identifier}/coach`),
@@ -230,6 +241,35 @@ export const api = {
     request<unknown>(`/contests/${contestId}/join`, { method: "DELETE" }),
   leaderboard: (contestId: number) =>
     request<Leaderboard>(`/contests/${contestId}/leaderboard`),
+  startVirtual: (contestId: number) =>
+    request<VirtualStatus>(`/contests/${contestId}/virtual`, { method: "POST" }),
+  virtualStatus: (contestId: number) => request<VirtualStatus>(`/contests/${contestId}/virtual`),
+
+  // ---- community -------------------------------------------------------
+  discussions: (problem: string | number, params: { sort?: "top" | "new"; limit?: number; offset?: number } = {}) =>
+    request<{ items: DiscussionPost[]; total: number }>(`/problems/${problem}/discussions${qs(params)}`),
+  createPost: (problem: string | number, body: { body: string; parent_id?: number }) =>
+    request<DiscussionPost>(`/problems/${problem}/discussions`, { method: "POST", body }),
+  editPost: (postId: number, body: string) =>
+    request<DiscussionPost>(`/discussions/${postId}`, { method: "PATCH", body: { body } }),
+  deletePost: (postId: number) => request<unknown>(`/discussions/${postId}`, { method: "DELETE" }),
+  votePost: (postId: number) =>
+    request<{ votes: number; voted_by_me: boolean }>(`/discussions/${postId}/vote`, { method: "POST" }),
+
+  lists: () => request<ProblemListInfo[]>("/lists"),
+  createList: (name: string) => request<ProblemListInfo>("/lists", { method: "POST", body: { name } }),
+  deleteList: (listId: number) => request<unknown>(`/lists/${listId}`, { method: "DELETE" }),
+  listProblems: (listId: number, params: { limit?: number; offset?: number } = {}) =>
+    request<Page<ProblemSummary>>(`/lists/${listId}/problems${qs(params)}`),
+  addToList: (listId: number, problemId: number) =>
+    request<unknown>(`/lists/${listId}/problems/${problemId}`, { method: "PUT" }),
+  removeFromList: (listId: number, problemId: number) =>
+    request<unknown>(`/lists/${listId}/problems/${problemId}`, { method: "DELETE" }),
+  listsContaining: (problemId: number) => request<number[]>(`/lists/containing/${problemId}`),
+
+  // An editorial may be drafted by the AI on first request, which takes a while.
+  editorial: (problem: string | number) =>
+    request<Editorial>(`/problems/${problem}/editorial`, { timeoutMs: 90_000 }),
 
   // ---- dashboard -------------------------------------------------------
   dashboard: () => request<Dashboard>("/dashboard"),

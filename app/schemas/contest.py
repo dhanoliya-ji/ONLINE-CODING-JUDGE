@@ -13,6 +13,7 @@ class ContestBase(BaseModel):
     start_time: datetime
     end_time: datetime
     penalty_minutes_per_wrong: int = Field(default=20, ge=0, le=120)
+    rated: bool = True
 
     @field_validator("start_time", "end_time")
     @classmethod
@@ -40,6 +41,7 @@ class ContestUpdate(BaseModel):
     start_time: datetime | None = None
     end_time: datetime | None = None
     penalty_minutes_per_wrong: int | None = Field(default=None, ge=0, le=120)
+    rated: bool | None = None
 
 
 class ContestResponse(ORMModel):
@@ -53,6 +55,9 @@ class ContestResponse(ORMModel):
     penalty_minutes_per_wrong: int
     state: str
     created_at: datetime
+    rated: bool = True
+    #: Scheduled automatically (the weekly round) rather than by an admin.
+    is_auto: bool = False
 
     problem_count: int = 0
     participant_count: int = 0

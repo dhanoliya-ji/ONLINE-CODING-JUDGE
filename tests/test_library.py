@@ -238,3 +238,43 @@ class TestVerify:
         assert problem is None
 
 
+
+
+ATCODER_PLAIN = """We have an integer sequence A, whose length is N, and we would like to count the
+non-empty contiguous subsequences of A whose sums are exactly zero, counting positions.
+
+Constraints
+
+* 1 \leq N \leq 2 \times 10^5
+
+Input
+
+Input is given from Standard Input in the following format:
+
+N
+A_1 A_2 ... A_N
+
+Output
+
+Find the number of such subsequences.
+
+Examples
+
+Input
+
+3
+1 -1 0
+
+Output
+
+3
+"""
+
+
+def test_atcoder_plain_headings_with_constraints():
+    row = _row(ATCODER_PLAIN, source="atcoder", url="https://atcoder.jp/contests/agc023/tasks/agc023_a")
+    candidate = taco.candidate_from_row(row)
+    assert candidate.constraints == "* 1 \leq N \leq 2 \times 10^5"
+    assert candidate.input_format.startswith("Input is given")
+    assert candidate.output_format == "Find the number of such subsequences."
+    assert candidate.sample_inputs and candidate.sample_inputs[0].split() == ["3", "1", "-1", "0"]

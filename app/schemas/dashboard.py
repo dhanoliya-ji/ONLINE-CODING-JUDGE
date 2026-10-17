@@ -22,6 +22,37 @@ class LanguageUsage(BaseModel):
     accepted: int
 
 
+class DayActivity(BaseModel):
+    date: str = Field(description="UTC day, YYYY-MM-DD")
+    submissions: int
+    accepted: int
+
+
+class TagProgress(BaseModel):
+    slug: str
+    name: str
+    solved: int
+    total: int
+
+
+class RatingPoint(BaseModel):
+    contest_id: int
+    contest_title: str
+    date: str
+    rank: int
+    old_rating: int
+    new_rating: int
+
+
+class Badge(BaseModel):
+    id: str
+    name: str
+    description: str
+    earned: bool
+    #: How far along, 0-1, for badges not yet earned.
+    progress: float
+
+
 class DashboardResponse(BaseModel):
     username: str
     email: str
@@ -39,3 +70,17 @@ class DashboardResponse(BaseModel):
     difficulty_progress: list[DifficultyProgress] = []
     language_usage: list[LanguageUsage] = []
     recent_submissions: list[SubmissionSummary] = []
+
+    #: Days with at least one submission over the last year, oldest first.
+    activity: list[DayActivity] = []
+    current_streak: int = Field(0, description="Consecutive days up to today (or yesterday) with a submission")
+    longest_streak: int = 0
+    #: Position on the global leaderboard (by problems solved), if ranked.
+    global_rank: int | None = None
+    member_since: str | None = None
+
+    rating: int | None = None
+    max_rating: int | None = None
+    rating_history: list[RatingPoint] = []
+    badges: list[Badge] = []
+    tag_progress: list[TagProgress] = []
