@@ -112,6 +112,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           <Command.Item value="leaderboard" onSelect={() => go("/leaderboard")} className={item}>▲ Leaderboard</Command.Item>
           {user && <Command.Item value="profile" onSelect={() => go("/dashboard")} className={item}>▦ My profile & progress</Command.Item>}
           {user && <Command.Item value="submissions" onSelect={() => go("/submissions")} className={item}>≡ My submissions</Command.Item>}
+          {user && <Command.Item value="lists" onSelect={() => go("/lists")} className={item}>☆ My lists & bookmarks</Command.Item>}
           <Command.Item value="theme" onSelect={() => { toggle(); onOpenChange(false); }} className={item}>◐ Toggle light / dark theme</Command.Item>
         </Command.Group>
       </Command.List>

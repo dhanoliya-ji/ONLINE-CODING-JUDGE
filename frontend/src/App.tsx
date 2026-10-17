@@ -13,6 +13,7 @@ import { Submissions } from "./pages/Submissions";
 import { Dashboard } from "./pages/Dashboard";
 import { NotFound } from "./pages/NotFound";
 import { Leaderboard } from "./pages/Leaderboard";
+import { Lists } from "./pages/Lists";
 
 // The code editor is ~210 kB gzipped — two thirds of the whole bundle — and is
 // only needed once someone opens a problem. Splitting it here keeps the
@@ -79,6 +80,14 @@ export default function App() {
               element={
                 <RequireAuth>
                   <Submissions />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="lists"
+              element={
+                <RequireAuth>
+                  <Lists />
                 </RequireAuth>
               }
             />

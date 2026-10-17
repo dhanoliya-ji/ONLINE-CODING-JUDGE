@@ -6,6 +6,7 @@ import { formatDate } from "../lib/format";
 import type { Contest, ContestProblem, Leaderboard } from "../lib/types";
 import { Alert, Badge, Button, Card, DifficultyBadge, EmptyState, Skeleton } from "../components/ui";
 import { Countdown, StateBadge } from "../components/problems/contest-bits";
+import { VirtualPanel } from "../components/problems/VirtualPanel";
 import { formatDuration } from "../components/problems/contest-format";
 
 export function ContestDetail() {
@@ -119,6 +120,8 @@ export function ContestDetail() {
           <div className="min-w-0 flex-[1_1_360px]">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <StateBadge state={contest.state} />
+              {contest.is_auto && <Badge tone="muted">Weekly</Badge>}
+              <Badge tone={contest.rated ? "warn" : "muted"}>{contest.rated ? "Rated" : "Unrated"}</Badge>
               {contest.is_registered && <Badge tone="info">✓ Registered</Badge>}
             </div>
 
@@ -167,6 +170,7 @@ export function ContestDetail() {
               </div>
             )}
 
+            {user && contest.state === "Ended" && <VirtualPanel contest={contest} />}
             {user ? (
               contest.state !== "Ended" && (
                 <Button
@@ -215,7 +219,7 @@ export function ContestDetail() {
               {problems.map((entry) => (
                 <li key={entry.id}>
                   <Link
-                    to={`/problems/${entry.problem.slug}`}
+                    to={`/problems/${entry.problem.slug}?contest=${contest.id}`}
                     className="group flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-surface-2"
                   >
                     <span

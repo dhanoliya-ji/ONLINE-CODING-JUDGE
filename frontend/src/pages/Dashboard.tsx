@@ -4,7 +4,9 @@ import { api } from "../lib/api";
 import { LANGUAGE_LABELS, relativeTime, verdictTone } from "../lib/format";
 import type { Dashboard as DashboardData } from "../lib/types";
 import { Alert, Card, EmptyState, Eyebrow, Skeleton, VerdictBadge } from "../components/ui";
+import { Badges } from "../components/profile/Badges";
 import { Heatmap } from "../components/profile/Heatmap";
+import { RatingChart } from "../components/profile/RatingChart";
 import { SolvedRing } from "../components/profile/SolvedRing";
 import { TopicSkyline } from "../components/profile/TopicSkyline";
 
@@ -102,6 +104,17 @@ export function Dashboard() {
       <Card solid className="p-6">
         <Heatmap activity={data.activity} />
       </Card>
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        <Card solid className="p-6">
+          <Eyebrow>Contest rating</Eyebrow>
+          <RatingChart history={data.rating_history} rating={data.rating} maxRating={data.max_rating} />
+        </Card>
+        <Card solid className="p-6">
+          <Eyebrow>Badges</Eyebrow>
+          <Badges badges={data.badges} />
+        </Card>
+      </div>
 
       {data.total_submissions === 0 ? (
         <Card solid>

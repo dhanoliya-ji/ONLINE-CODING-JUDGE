@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Group, Panel, Separator, useDefaultLayout, type LayoutStorage } from "react-resizable-panels";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -9,6 +9,11 @@ import { CoachPanel } from "../components/CoachPanel";
 import { CodeEditor } from "../components/CodeEditor";
 import { Markdown } from "../components/Markdown";
 import { STARTERS } from "../components/solve/starters";
+import { BookmarkButton } from "../components/solve/BookmarkButton";
+import { ContestBanner } from "../components/solve/ContestMode";
+import { useContestMode } from "../components/solve/useContestMode";
+import { DiscussionTab } from "../components/solve/DiscussionTab";
+import { EditorialTab } from "../components/solve/EditorialTab";
 import { SubmissionsTab } from "../components/solve/SubmissionsTab";
 import { useMediaQuery } from "../components/solve/useMediaQuery";
 import { JudgingState, RunOutput, SubmissionResult } from "../components/solve/Verdict";
@@ -70,6 +75,15 @@ function Workspace({ slug }: { slug: string }) {
   const { user } = useAuth();
   const wide = useMediaQuery("(min-width: 900px)");
 
+  // Opened from a contest page: submit to that contest while it (or the
+  // user's virtual replay of it) is running.
+  const [params] = useSearchParams();
+  const contestId = Number(params.get("contest")) || null;
+  const [modeVersion, setModeVersion] = useState(0);
+  const mode = useContestMode(contestId, user != null, modeVersion);
+  const competing = mode !== null && mode.kind !== "over";
+  const refreshMode = useCallback(() => setModeVersion((v) => v + 1), []);
+
   const [problem, setProblem] = useState<Problem | null>(null);
   const [samples, setSamples] = useState<TestCasePublic[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -86,7 +100,7 @@ function Workspace({ slug }: { slug: string }) {
   const [celebrateId, setCelebrateId] = useState<number | null>(null);
   const [submitCount, setSubmitCount] = useState(0);
 
-  const [leftTab, setLeftTab] = useState<"description" | "submissions">("description");
+  const [leftTab, setLeftTab] = useState<"description" | "submissions" | "editorial" | "discussion">("description");
   const [consoleTab, setConsoleTab] = useState<"input" | "result">("input");
   const [mobileView, setMobileView] = useState<"problem" | "code">("problem");
 
@@ -186,7 +200,12 @@ function Workspace({ slug }: { slug: string }) {
     setConsoleTab("result");
     setMobileView("code");
     try {
-      const submission = await api.submit({ problem_id: problem.id, language, source_code: code });
+      const submission = await api.submit({
+        problem_id: problem.id,
+        language,
+        source_code: code,
+        contest_id: competing ? mode.contest.id : undefined,
+      });
       setResult(submission);
       setCelebrateId(submission.id);
       setSubmitCount((count) => count + 1);
@@ -257,6 +276,13 @@ function Workspace({ slug }: { slug: string }) {
         items={[
           { id: "description", label: "Description" },
           { id: "submissions", label: "Submissions" },
+          // Solutions and discussion stay out of view while competing.
+          ...(competing
+            ? []
+            : [
+                { id: "editorial" as const, label: "Editorial" },
+                { id: "discussion" as const, label: "Discussion" },
+              ]),
         ]}
       />
       <div
@@ -267,6 +293,10 @@ function Workspace({ slug }: { slug: string }) {
       >
         {leftTab === "description" ? (
           <Description problem={problem} examples={examples} onUseExample={loadExample} />
+        ) : leftTab === "editorial" && !competing ? (
+          <EditorialTab slug={slug} signedIn={signedIn} />
+        ) : leftTab === "discussion" && !competing ? (
+          <DiscussionTab slug={slug} signedIn={signedIn} />
         ) : (
           <SubmissionsTab
             problemId={problem.id}
@@ -356,6 +386,7 @@ function Workspace({ slug }: { slug: string }) {
 
   return (
     <div className="flex flex-col min-[900px]:h-[calc(100dvh-3.75rem)]">
+      {mode && <ContestBanner mode={mode} onElapsed={refreshMode} />}
       <HeaderBar
         problem={problem}
         language={language}
@@ -365,14 +396,17 @@ function Workspace({ slug }: { slug: string }) {
         onRun={handleRun}
         onSubmit={handleSubmit}
         coach={
-          <CoachPanel
-            key={problem.slug}
-            slug={problem.slug}
-            code={code}
-            language={language}
-            verdict={lastVerdict(result, runResult)}
-            variant="inline"
-          />
+          <>
+            {signedIn && <BookmarkButton problemId={problem.id} />}
+            <CoachPanel
+              key={problem.slug}
+              slug={problem.slug}
+              code={code}
+              language={language}
+              verdict={lastVerdict(result, runResult)}
+              variant="inline"
+            />
+          </>
         }
       />
 

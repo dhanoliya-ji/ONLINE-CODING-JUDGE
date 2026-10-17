@@ -218,6 +218,7 @@ function AccountMenu({ username, isAdmin, onSignOut }: { username: string; isAdm
           {[
             { to: "/dashboard", label: "Profile & progress" },
             { to: "/submissions", label: "My submissions" },
+            { to: "/lists", label: "My lists" },
           ].map((item) => (
             <Link key={item.to} to={item.to} role="menuitem" onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm text-ink-2 hover:bg-surface-2 hover:text-ink">
               {item.label}
