@@ -176,7 +176,7 @@ configuration is needed when the API is running locally.
 |---|---|
 | **Accounts** | `admin@example.com` (or the first entry in `ADMIN_EMAILS`) and `demo@example.com` |
 | **Problems** | 6 — three Easy, two Medium, one Hard, with 31 test cases |
-| **Contest** | "Practice Round #1" — already open, running for a year, four problems |
+| **Contest** | "Practice Round #1": a finished, unrated two-hour round with four problems, ready to replay as a virtual contest. Rated weekly rounds are scheduled automatically from imported problems. |
 
 It is **idempotent**: re-running will not duplicate rows. `--reset` drops every
 table first.

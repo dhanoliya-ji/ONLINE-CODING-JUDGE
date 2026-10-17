@@ -208,6 +208,17 @@ locally and still deploy to a free host that forbids it.
 - Window and registration enforced on submit
 - Labels (A, B, C…) and per-problem points
 - Leaderboard with ICPC penalty, tie-aware ranks
+- **Ratings**, Codeforces-style, with history on your profile
+- **Weekly rounds** scheduled automatically (Sundays 14:00 UTC)
+  from fresh library problems, sealed until the start
+- **Virtual contests**: replay any past round on your own clock
+- Global leaderboard
+
+**Community**
+- Discussions per problem (hidden during live contests)
+- Editorials, AI-drafted from a verified solution
+- Bookmarks and personal problem lists
+- Profile: heatmap, streaks, topic mastery, badges
 
 **Practice coach (AI, free)**
 - Chat on the Solve page: approach, hints, debugging, anything
@@ -217,7 +228,9 @@ locally and still deploy to a free host that forbids it.
 - Groq with Gemini fallback, per-user daily limit
 
 **Frontend & operations**
-- React 19 + TypeScript, glassmorphic UI
+- React 19 + TypeScript, "Molten Forge" design: dark and
+  light themes, WebGL hero (lazy-loaded), resizable IDE-style
+  workspace, KaTeX maths, Ctrl-K command palette
 - CodeMirror 6 editor, drafts persisted locally
 - Cold-start detection and messaging
 - `/health` reporting DB and sandbox status
@@ -399,7 +412,6 @@ that documents its edges.
 - [ ] **Dedicated judge workers** — isolate execution from the credential-holding host
 - [ ] **Special judges** — checker programs for problems with multiple valid answers
 - [ ] **Rejudge** — re-run a problem's submissions after a test-suite fix
-- [ ] **Editorials**
 - [ ] **Plagiarism detection** — MOSS-style similarity over accepted solutions
 
 ---

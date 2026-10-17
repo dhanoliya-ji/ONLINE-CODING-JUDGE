@@ -494,7 +494,56 @@ sealed until the clock starts.
 
 ---
 
+## Contests: ratings, weekly rounds and replays
+
+- Contests carry `rated` (default `true`) and `is_auto` (the weekly round).
+  When a contest ends it is **finalised**: rated contests update every
+  participant's `rating` (Codeforces-style; see `app/services/rating.py`),
+  and an automatic round's sealed problems join the public library.
+- A rated **Weekly Round** is kept scheduled for Sundays 14:00 UTC (90
+  minutes, Easy/Medium/Medium/Hard from unused imported problems). There is
+  no cron on the free host: this runs on start-up and from contest pages.
+  `WEEKLY_CONTESTS=false` turns it off.
+- A problem sealed for a contest is `404` until that contest starts.
+
+### `POST /contests/{id}/virtual` 🔑 · `GET /contests/{id}/virtual` 🔑
+
+Start, or check, your replay of a **finished** contest. While it runs,
+submissions with that `contest_id` count towards the replay only, never the
+real standings or ratings, and the coach is off. The response has your
+`entry` (scored from your own start), `virtual_rank` among the real final
+standings, `active` and `ends_at`. `409` for a contest that has not ended,
+one you took part in live, or one you already replayed.
+
+### `GET /leaderboard` 🌐
+
+Everyone with an accepted solution, ranked by problems solved (harder
+solves, then fewer submissions, break ties).
+
+## Community
+
+Discussion and editorial endpoints return `403` while the problem is in a
+live or upcoming contest, so they cannot leak answers.
+
+| Endpoint | Access | Notes |
+|---|---|---|
+| `GET /problems/{id\|slug}/discussions?sort=top\|new` | 🌐 | Threads with their replies, vote counts and `voted_by_me` |
+| `POST /problems/{id\|slug}/discussions` | 🔑 | `{"body", "parent_id"?}`; replies attach to a thread, one level deep; 20 posts an hour |
+| `PATCH /discussions/{id}` · `DELETE /discussions/{id}` | 🔑 | Your own posts (admins may delete any); deletion keeps the post's place |
+| `POST /discussions/{id}/vote` | 🔑 | Toggles your upvote |
+| `GET /lists` · `POST /lists` · `DELETE /lists/{id}` | 🔑 | Your lists; "Bookmarks" is created for you |
+| `GET /lists/{id}/problems` · `PUT`/`DELETE /lists/{id}/problems/{problem_id}` | 🔑 | List contents |
+| `GET /lists/containing/{problem_id}` | 🔑 | Which of your lists hold a problem |
+| `GET /problems/{id\|slug}/editorial` | 🌐 / 🔑 | Cached editorial; the first request (signed in) has the AI draft it from the problem's verified reference solution, counting as one coach reply |
+| `PUT /problems/{id}/editorial` | 👑 | Replace with a staff-written one |
+
 ## Dashboard
+
+Besides the totals below, the profile response includes `activity` (a year of
+per-day counts for the heatmap), `current_streak` / `longest_streak`,
+`tag_progress` (solved vs. available per topic), `global_rank`, `rating`,
+`max_rating`, `rating_history` and `badges` (each with `earned` and
+`progress`).
 
 ### `GET /dashboard` 🔑
 

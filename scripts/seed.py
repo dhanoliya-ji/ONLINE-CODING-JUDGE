@@ -316,14 +316,16 @@ def _seed_contest(db, admin: User, problems: list[Problem]) -> None:
             lambda s: db.scalar(select(Contest.id).where(Contest.slug == s)) is not None,
         ),
         description=(
-            "An always-open practice contest seeded for the demo. It starts an "
-            "hour in the past and runs for a year, so you can join and submit "
-            "at any time."
+            "A finished two-hour round seeded for the demo. Replay it as a "
+            "virtual contest to try the contest flow; the rated weekly rounds "
+            "are scheduled automatically."
         ),
-        # A window that is already open, so the demo is immediately usable.
-        start_time=now - timedelta(hours=1),
-        end_time=now + timedelta(days=365),
+        # Already over: a contest that never ended would keep its problems
+        # out of practice (no coach, editorial or discussion) indefinitely.
+        start_time=now - timedelta(days=1, hours=2),
+        end_time=now - timedelta(days=1),
         penalty_minutes_per_wrong=20,
+        rated=False,
         created_by=admin.id,
     )
     db.add(contest)
