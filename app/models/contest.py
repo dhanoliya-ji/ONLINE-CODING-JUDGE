@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -41,6 +41,13 @@ class Contest(TimestampMixin, Base):
     created_by: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+
+    #: Whether finishing this contest moves its participants' ratings.
+    rated: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1", nullable=False)
+    #: Created by the weekly scheduler rather than by an admin.
+    is_auto: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
+    #: Set once the contest has ended and been rated, and its problems published.
+    finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     problem_links: Mapped[list["ContestProblem"]] = relationship(
         back_populates="contest",

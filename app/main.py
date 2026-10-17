@@ -74,6 +74,14 @@ async def lifespan(app: FastAPI):
     # every schema change after it -- work with no manual migration step.
     _migrate()
 
+    # Finalise contests that ended while the service slept, and keep a
+    # weekly round scheduled (no cron on the free host).
+    from app.database import SessionLocal
+    from app.services.contest_lifecycle import maintain
+
+    with SessionLocal() as db:
+        maintain(db, force=True)
+
     from app.execution.engine import get_backend
 
     backend = get_backend()

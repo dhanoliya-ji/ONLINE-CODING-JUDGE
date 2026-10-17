@@ -12,6 +12,8 @@ from sqlalchemy import case, distinct, func, select
 from sqlalchemy.orm import Session
 
 from app.models.base import utcnow
+from app.models.community import RatingChange
+from app.models.contest import Contest
 from app.models.contest_registration import ContestRegistration
 from app.models.enums import Verdict
 from app.models.problem import Problem
@@ -22,7 +24,9 @@ from app.schemas.dashboard import (
     DashboardResponse,
     DayActivity,
     DifficultyProgress,
+    Badge,
     LanguageUsage,
+    RatingPoint,
     TagProgress,
     VerdictCount,
 )
@@ -148,8 +152,52 @@ def build_dashboard(db: Session, user: User) -> DashboardResponse:
         **_activity(db, user),
         tag_progress=_tag_progress(db, user),
         global_rank=_global_rank(db, problems_solved),
+        rating=user.rating,
+        max_rating=user.max_rating,
+        rating_history=_rating_history(db, user),
+        badges=_badges(db, user, problems_solved, contests_participated,
+                       {lang for lang, *_ in language_rows}, solved_by_difficulty),
         member_since=user.created_at.date().isoformat() if user.created_at else None,
     )
+
+
+def _rating_history(db: Session, user: User) -> list[RatingPoint]:
+    rows = db.execute(
+        select(RatingChange, Contest.title, Contest.end_time)
+        .join(Contest, Contest.id == RatingChange.contest_id)
+        .where(RatingChange.user_id == user.id)
+        .order_by(Contest.end_time)
+    ).all()
+    return [
+        RatingPoint(contest_id=change.contest_id, contest_title=title, date=end.date().isoformat(),
+                    rank=change.rank, old_rating=change.old_rating, new_rating=change.new_rating)
+        for change, title, end in rows
+    ]
+
+
+def _badges(db: Session, user: User, solved: int, contests: int, languages: set[str],
+            by_difficulty: dict) -> list[Badge]:
+    """Milestones, computed from what is already recorded: nothing to store."""
+    streak = _activity(db, user)["longest_streak"]
+    hard = int(by_difficulty.get("Hard", 0))
+
+    def badge(id_: str, name: str, description: str, have: float, need: float) -> Badge:
+        return Badge(id=id_, name=name, description=description, earned=have >= need,
+                     progress=round(min(1.0, have / need), 3))
+
+    return [
+        badge("first-ac", "First blood", "Get your first Accepted", solved, 1),
+        badge("solved-10", "Warming up", "Solve 10 problems", solved, 10),
+        badge("solved-50", "Forged", "Solve 50 problems", solved, 50),
+        badge("solved-250", "Tempered steel", "Solve 250 problems", solved, 250),
+        badge("solved-1000", "Master smith", "Solve 1000 problems", solved, 1000),
+        badge("hard-10", "Hard boiled", "Solve 10 Hard problems", hard, 10),
+        badge("streak-7", "On a roll", "Practise 7 days in a row", streak, 7),
+        badge("streak-30", "Unbreakable", "Practise 30 days in a row", streak, 30),
+        badge("polyglot", "Polyglot", "Submit in 5 different languages", len(languages), 5),
+        badge("contestant", "Into the arena", "Join a contest", contests, 1),
+        badge("rated", "On the ladder", "Earn a contest rating", 1 if user.rating else 0, 1),
+    ]
 
 
 def _global_rank(db: Session, solved: int) -> int | None:

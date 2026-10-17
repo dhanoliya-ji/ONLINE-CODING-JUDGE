@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     #: Replies per user per UTC day, so one user cannot spend everyone's quota.
     COACH_DAILY_LIMIT: int = Field(default=40, ge=1, le=1000)
 
+    # ---- Contests --------------------------------------------------------
+    #: Keep a rated "Weekly Round" scheduled (Sundays 14:00 UTC), built from
+    #: unused library problems. See app/services/contest_lifecycle.py.
+    WEEKLY_CONTESTS: bool = True
+
     # ------------------------------------------------------------------ #
     # Derived helpers
     # ------------------------------------------------------------------ #

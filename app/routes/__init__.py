@@ -6,6 +6,7 @@ from app.routes import (
     auth,
     catalogue,
     coach,
+    community,
     contest_problems,
     contests,
     dashboard,
@@ -14,6 +15,7 @@ from app.routes import (
     problems,
     submissions,
     test_cases,
+    virtual,
 )
 
 api_router = APIRouter()
@@ -27,10 +29,12 @@ api_router.include_router(auth.router)
 api_router.include_router(catalogue.router)
 api_router.include_router(problems.router)
 api_router.include_router(coach.router)
+api_router.include_router(community.router)
 api_router.include_router(test_cases.router)
 api_router.include_router(submissions.router)
 api_router.include_router(contests.router)
 api_router.include_router(contest_problems.router)
+api_router.include_router(virtual.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(leaderboard.router)
 

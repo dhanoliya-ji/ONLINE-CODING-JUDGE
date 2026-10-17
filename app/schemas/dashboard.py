@@ -35,6 +35,24 @@ class TagProgress(BaseModel):
     total: int
 
 
+class RatingPoint(BaseModel):
+    contest_id: int
+    contest_title: str
+    date: str
+    rank: int
+    old_rating: int
+    new_rating: int
+
+
+class Badge(BaseModel):
+    id: str
+    name: str
+    description: str
+    earned: bool
+    #: How far along, 0-1, for badges not yet earned.
+    progress: float
+
+
 class DashboardResponse(BaseModel):
     username: str
     email: str
@@ -60,4 +78,9 @@ class DashboardResponse(BaseModel):
     #: Position on the global leaderboard (by problems solved), if ranked.
     global_rank: int | None = None
     member_since: str | None = None
+
+    rating: int | None = None
+    max_rating: int | None = None
+    rating_history: list[RatingPoint] = []
+    badges: list[Badge] = []
     tag_progress: list[TagProgress] = []

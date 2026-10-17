@@ -15,6 +15,7 @@ from app.models.test_case import TestCase
 from app.models.user import User
 from app.schemas.common import Message, Page
 from app.services import catalogue
+from app.services.access import can_view_problem
 from app.schemas.problem import (
     ProblemCreate,
     ProblemResponse,
@@ -152,9 +153,8 @@ def get_problem(
     viewer: User | None = Depends(get_optional_user),
 ) -> ProblemResponse:
     problem = _resolve(db, identifier)
-    is_admin = bool(viewer and viewer.is_admin)
 
-    if not problem.is_public and not is_admin:
+    if not can_view_problem(db, problem, viewer):
         # 404 rather than 403: an unpublished problem should not be discoverable.
         raise _not_found()
 

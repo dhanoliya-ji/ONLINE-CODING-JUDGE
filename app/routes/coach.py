@@ -23,6 +23,8 @@ from app.models.user import User
 from app.routes.problems import _not_found, _resolve
 from app.schemas.coach import CoachReply, CoachRequest, CoachStatus
 from app.services import coach as coach_service
+from app.services.access import can_view_problem
+from app.services.virtual import any_active_virtual
 
 router = APIRouter(prefix="/problems", tags=["Coach"])
 
@@ -30,6 +32,7 @@ PROBLEM_IN_CONTEST = (
     "The coach is off for this problem: it is part of a live or upcoming contest."
 )
 USER_IN_CONTEST = "The coach is off while you are competing in a live contest. Good luck!"
+USER_IN_VIRTUAL = "The coach is off during your virtual contest. Good luck!"
 
 
 @router.get(
@@ -106,7 +109,7 @@ def ask_coach(
 # ---------------------------------------------------------------------- #
 def _visible_problem(db: Session, identifier: str, viewer: User | None) -> Problem:
     problem = _resolve(db, identifier)
-    if not problem.is_public and not (viewer and viewer.is_admin):
+    if not can_view_problem(db, problem, viewer):
         raise _not_found()
     return problem
 
@@ -124,6 +127,8 @@ def _blocked_reason(db: Session, problem: Problem, user: User | None) -> str | N
         for registration in registrations:
             if registration.contest.state_at(now) is ContestState.RUNNING:
                 return USER_IN_CONTEST
+        if any_active_virtual(db, user) is not None:
+            return USER_IN_VIRTUAL
     return None
 
 

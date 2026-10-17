@@ -6,6 +6,15 @@ what ``Base.metadata.create_all()`` and the test fixtures rely on.
 
 from app.models.base import Base, TimestampMixin, utcnow
 from app.models.coach_usage import CoachUsage
+from app.models.community import (
+    DiscussionPost,
+    Editorial,
+    ProblemList,
+    RatingChange,
+    VirtualParticipation,
+    discussion_votes,
+    problem_list_items,
+)
 from app.models.contest import Contest
 from app.models.contest_problem import ContestProblem
 from app.models.contest_registration import ContestRegistration
@@ -27,6 +36,13 @@ __all__ = [
     "TimestampMixin",
     "utcnow",
     "CoachUsage",
+    "DiscussionPost",
+    "Editorial",
+    "ProblemList",
+    "RatingChange",
+    "VirtualParticipation",
+    "discussion_votes",
+    "problem_list_items",
     "Contest",
     "ContestProblem",
     "ContestRegistration",

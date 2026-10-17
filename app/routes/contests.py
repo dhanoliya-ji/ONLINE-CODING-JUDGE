@@ -21,6 +21,7 @@ from app.schemas.contest_registration import (
     ParticipantResponse,
 )
 from app.schemas.leaderboard import LeaderboardResponse
+from app.services.contest_lifecycle import maintain
 from app.services.leaderboard import build_leaderboard
 from app.utils.slug import unique_slug
 
@@ -35,6 +36,7 @@ def list_contests(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> Page[ContestResponse]:
+    maintain(db)
     now = datetime.now(timezone.utc)
 
     conditions = []
@@ -75,6 +77,7 @@ def get_contest(
     db: Session = Depends(get_db),
     viewer: User | None = Depends(get_optional_user),
 ) -> ContestResponse:
+    maintain(db)
     return _to_response(db, _resolve(db, identifier), viewer)
 
 
@@ -95,6 +98,7 @@ def create_contest(
         start_time=payload.start_time,
         end_time=payload.end_time,
         penalty_minutes_per_wrong=payload.penalty_minutes_per_wrong,
+        rated=payload.rated,
         slug=unique_slug(payload.title, lambda s: _slug_taken(db, s)),
         created_by=admin.id,
     )
@@ -282,6 +286,8 @@ def _to_response(
         penalty_minutes_per_wrong=contest.penalty_minutes_per_wrong,
         state=contest.state.value,
         created_at=contest.created_at,
+        rated=contest.rated,
+        is_auto=contest.is_auto,
     )
 
     response.problem_count = (
