@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -20,7 +20,6 @@ export function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
-  useEffect(() => setMenuOpen(false), [location.pathname]);
 
   // Ctrl/⌘ K opens the command palette from anywhere.
   useEffect(() => {
@@ -117,6 +116,7 @@ export function Layout() {
               <NavLink
                 key={item.to}
                 to={item.to}
+                onClick={() => setMenuOpen(false)}
                 className={({ isActive }) =>
                   ["block rounded-lg px-3 py-2.5 text-sm font-medium", isActive ? "bg-surface-2 text-ink" : "text-ink-2"].join(" ")
                 }
@@ -124,7 +124,7 @@ export function Layout() {
                 {item.label}
               </NavLink>
             ))}
-            <button onClick={() => setPaletteOpen(true)} className="block w-full rounded-lg px-3 py-2.5 text-left text-sm text-ink-2">
+            <button onClick={() => { setMenuOpen(false); setPaletteOpen(true); }} className="block w-full rounded-lg px-3 py-2.5 text-left text-sm text-ink-2">
               Search…
             </button>
           </div>
@@ -176,11 +176,25 @@ function ThemeToggle() {
 
 function AccountMenu({ username, isAdmin, onSignOut }: { username: string; isAdmin: boolean; onSignOut: () => void }) {
   const [open, setOpen] = useState(false);
-  const location = useLocation();
-  useEffect(() => setOpen(false), [location.pathname]);
+  const menu = useRef<HTMLDivElement>(null);
+
+  // Close on a click outside or Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!menu.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   return (
-    <div className="relative">
+    <div ref={menu} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
@@ -205,7 +219,7 @@ function AccountMenu({ username, isAdmin, onSignOut }: { username: string; isAdm
             { to: "/dashboard", label: "Profile & progress" },
             { to: "/submissions", label: "My submissions" },
           ].map((item) => (
-            <Link key={item.to} to={item.to} role="menuitem" className="block rounded-lg px-3 py-2 text-sm text-ink-2 hover:bg-surface-2 hover:text-ink">
+            <Link key={item.to} to={item.to} role="menuitem" onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2 text-sm text-ink-2 hover:bg-surface-2 hover:text-ink">
               {item.label}
             </Link>
           ))}
