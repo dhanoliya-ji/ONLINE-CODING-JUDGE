@@ -19,7 +19,7 @@
 # valid instead of letting an upstream retag break the build.
 # Pinned to a digest as well as a tag: a tag can be re-pointed, a digest
 # cannot. Dependabot (docker ecosystem) bumps the digest when the tag moves.
-FROM python:3.11-slim-trixie@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce
+FROM python:3.11-slim-trixie@sha256:b7a9e5f6a93d6d4a31f129bbd4bdee69efccb6ded0fb230d78aafaf37af98377
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
